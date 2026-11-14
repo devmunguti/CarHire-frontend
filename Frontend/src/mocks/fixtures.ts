@@ -10,6 +10,14 @@ export const users: User[] = [
   { id: 'usr-05', name: 'David Kiptoo', email: 'david@autohire.ke', phone: '254112345605', role: 'mechanic' },
 ]
 
+export const customers = [
+  { id: 'cus-01', name: 'Faith Wambui' },
+  { id: 'cus-02', name: 'Samuel Kipchoge' },
+  { id: 'cus-03', name: 'Grace Atieno' },
+  { id: 'cus-04', name: 'Joseph Kamau' },
+  { id: 'cus-05', name: 'Lilian Muthoni' },
+]
+
 export const vehicles: Vehicle[] = [
   { id: 'car-01', make: 'Toyota', model: 'Prado TX', year: 2023, registration: 'KDA 101A', seats: 7, transmission: 'automatic', ratePerDay: 18000, status: 'available' },
   { id: 'car-02', make: 'Toyota', model: 'Axio', year: 2022, registration: 'KDB 202B', seats: 5, transmission: 'automatic', ratePerDay: 6500, status: 'booked' },
@@ -26,22 +34,63 @@ export const vehicles: Vehicle[] = [
 ]
 
 const bookingStatuses: BookingStatus[] = [
-  'pending', 'awaiting_approval', 'approved', 'confirmed', 'active', 'completed',
-  'cancelled', 'rejected', 'overdue', 'draft', 'pending', 'awaiting_approval',
-  'approved', 'confirmed', 'active', 'completed', 'cancelled', 'rejected', 'overdue', 'draft',
+  'reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired',
+  'reserved', 'confirmed', 'checked_out', 'completed', 'reserved', 'overdue', 'cancelled',
+  'reserved', 'confirmed', 'checked_out', 'expired', 'completed', 'reserved',
 ]
 
 export const bookings: Booking[] = bookingStatuses.map((status, index) => {
   const day = String((index % 27) + 1).padStart(2, '0')
   const vehicle = vehicles[index % vehicles.length]
+  const baseDays = (index % 5) + 1
+  const mode = index % 3 === 0 ? 'chauffeur' as const : 'self_drive' as const
+  const baseAmountKes = vehicle.ratePerDay * baseDays
+  const chauffeurFeeKes = mode === 'chauffeur' ? 3500 * baseDays : 0
+  const extras = index % 2 === 0 ? [{ code: 'baby_seat', label: 'Baby seat', amountKes: 500 * baseDays }] : []
+  const vatAmountKes = Math.round((baseAmountKes + chauffeurFeeKes + extras.reduce((sum, item) => sum + item.amountKes, 0)) * 0.16)
+  const totalDueKes = baseAmountKes + chauffeurFeeKes + extras.reduce((sum, item) => sum + item.amountKes, 0) + vatAmountKes
+  const user = users[index % users.length]
+  const customer = customers[index % customers.length]
   return {
     id: `booking-${String(index + 1).padStart(2, '0')}`,
-    reference: `AH-${String(2600 + index)}`,
+    reference: `BK-2611-${String(index + 1).padStart(4, '0')}`,
     vehicleId: vehicle.id,
-    customerId: users[index % users.length].id,
+    customerId: customer.id,
+    customerName: customer.name,
+    customerPhone: `254712345${String(index + 1).padStart(3, '0')}`,
+    customerEmail: `${customer.name.toLowerCase().replaceAll(' ', '.')}@example.ke`,
+    customerIdNumber: `ID${String(100000 + index)}`,
     status,
+    pendingApproval: status === 'reserved' && index % 2 === 0,
+    mode,
+    paymentMethod: (['mpesa_online', 'mpesa_manual', 'cash', 'bank', 'corporate'] as const)[index % 5],
+    holdExpiresAt: status === 'reserved' ? new Date(Date.now() + (30 + index * 3) * 60_000).toISOString() : undefined,
+    createdById: user.id,
     pickupAt: `2026-11-${day}T06:00:00.000Z`,
     returnAt: `2026-11-${day}T15:00:00.000Z`,
-    totalKes: vehicle.ratePerDay * ((index % 5) + 1),
+    totalKes: totalDueKes,
+    pricingSnapshot: {
+      baseDays,
+      baseRateKes: vehicle.ratePerDay,
+      baseAmountKes,
+      chauffeurFeeKes,
+      extras,
+      vatRate: 16,
+      vatAmountKes,
+      totalDueKes,
+      refundableDepositKes: 15000,
+    },
+    payments: index % 4 === 0 ? [{ id: `pay-${index + 1}`, method: 'mpesa_manual', amountKes: 5000, status: 'pending', reference: `MP-${index + 1}`, createdAt: `2026-11-${day}T05:30:00.000Z` }] : [],
+    events: [{ id: `evt-${index + 1}`, type: 'created', actor: user.name, note: 'Booking created', createdAt: `2026-11-${day}T05:00:00.000Z` }],
+    driver: mode === 'chauffeur' ? users.find((item) => item.role === 'driver') : undefined,
+    inspections: [],
+    auditEntries: [{ id: `audit-${index + 1}`, type: 'booking.created', actor: user.name, note: 'Booking record created', createdAt: `2026-11-${day}T05:00:00.000Z` }],
+    accruedLateFeeKes: status === 'overdue' ? 1500 * (index + 1) : 0,
   }
 })
+
+export const incidents = [
+  { id: 'inc-01', reference: 'SOS-101', status: 'open' as const, description: 'Vehicle breakdown reported', createdAt: '2026-11-14T06:20:00.000Z' },
+  { id: 'inc-02', reference: 'SOS-102', status: 'dispatched' as const, description: 'Mechanic dispatched', createdAt: '2026-11-14T07:15:00.000Z' },
+  { id: 'inc-03', reference: 'SOS-103', status: 'resolved' as const, description: 'Incident resolved', createdAt: '2026-11-13T10:00:00.000Z' },
+]

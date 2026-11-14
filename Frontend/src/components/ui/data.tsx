@@ -18,7 +18,7 @@ export function DataTable<T extends object>({
     <div className="table-scroll">
       <table className="data-table">
         <thead><tr>{columns.map((column) => <th key={column.key} scope="col">{column.header}</th>)}</tr></thead>
-        <tbody>{rows.map((row) => <tr key={rowKey(row)}>{columns.map((column) => <td key={column.key}>{column.render(row)}</td>)}</tr>)}</tbody>
+        <tbody>{rows.map((row) => <tr key={rowKey(row)}>{columns.map((column) => <td data-label={column.header} key={column.key}>{column.render(row)}</td>)}</tr>)}</tbody>
       </table>
     </div>
   )

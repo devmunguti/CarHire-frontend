@@ -17,9 +17,11 @@ const ContactPage = lazy(() => import('./pages/public').then((module) => ({ defa
 const CheckoutPage = lazy(() => import('./pages/public').then((module) => ({ default: module.CheckoutPage })))
 const BookingPage = lazy(() => import('./pages/public').then((module) => ({ default: module.BookingPage })))
 const LoginPage = lazy(() => import('./features/auth/LoginPage').then((module) => ({ default: module.LoginPage })))
-const DashboardPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.DashboardPage })))
+const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const FleetPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.FleetPage })))
-const BookingsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.BookingsPage })))
+const BookingsPage = lazy(() => import('./features/bookings/BookingsListPage').then((module) => ({ default: module.BookingsListPage })))
+const BookingWizardPage = lazy(() => import('./features/bookings/BookingWizard').then((module) => ({ default: module.BookingWizard })))
+const BookingDetailPage = lazy(() => import('./features/bookings/BookingDetailPage').then((module) => ({ default: module.BookingDetailPage })))
 const ApprovalsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.ApprovalsPage })))
 const HandoverPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.HandoverPage })))
 const TimelinePage = lazy(() => import('./pages/admin').then((module) => ({ default: module.TimelinePage })))
@@ -29,6 +31,7 @@ const MyTripsPage = lazy(() => import('./pages/admin').then((module) => ({ defau
 const IncidentsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.IncidentsPage })))
 const StaffPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.StaffPage })))
 const AuditPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.AuditPage })))
+const ProfilePage = lazy(() => import('./pages/admin').then((module) => ({ default: module.ProfilePage })))
 const StyleguidePage = lazy(() => import('./pages/StyleguidePage').then((module) => ({ default: module.StyleguidePage })))
 
 const officeRoles: UserRole[] = ['owner', 'manager', 'agent']
@@ -39,7 +42,7 @@ const mechanicsRoles: UserRole[] = ['owner', 'manager', 'agent', 'driver']
 const incidentRoles: UserRole[] = ['owner', 'manager', 'agent', 'mechanic']
 
 function PendingPage() {
-  return <main aria-label={t('styleguide.loading')} className="route-pending"><Skeleton rows={3} /></main>
+  return <div aria-label={t('styleguide.loading')} className="route-pending" role="status"><Skeleton rows={3} /></div>
 }
 
 function LoadPage({ children }: { children: ReactNode }) {
@@ -83,8 +86,8 @@ export const router = createBrowserRouter([
         { path: 'vehicles/:id/edit', element: protectedPage(['owner', 'manager'], FleetPage) },
         { path: 'fleet', element: protectedPage(vehicleReadRoles, FleetPage) },
         { path: 'bookings', element: protectedPage(officeRoles, BookingsPage) },
-        { path: 'bookings/new', element: protectedPage(officeRoles, BookingsPage) },
-        { path: 'bookings/:id', element: protectedPage(['owner', 'manager', 'agent', 'driver'], BookingsPage) },
+        { path: 'bookings/new', element: protectedPage(officeRoles, BookingWizardPage) },
+        { path: 'bookings/:id', element: protectedPage(['owner', 'manager', 'agent', 'driver'], BookingDetailPage) },
         { path: 'bookings/:id/check-out', element: protectedPage(handoverRoles, HandoverPage) },
         { path: 'bookings/:id/check-in', element: protectedPage(handoverRoles, HandoverPage) },
         { path: 'approvals', element: protectedPage(officeRoles, ApprovalsPage) },
@@ -95,6 +98,7 @@ export const router = createBrowserRouter([
         { path: 'my-trips', element: protectedPage(['driver'], MyTripsPage) },
         { path: 'staff', element: protectedPage(['owner', 'manager'], StaffPage) },
         { path: 'audit', element: protectedPage(['owner'], AuditPage) },
+        { path: 'profile', element: protectedPage(allRoles, ProfilePage) },
       ],
     }],
   },

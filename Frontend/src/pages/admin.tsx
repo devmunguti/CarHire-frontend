@@ -13,3 +13,4 @@ export function MyTripsPage() { const { t } = useTranslation(); return <PagePlac
 export function IncidentsPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.incidents')} /> }
 export function StaffPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.staff')} /> }
 export function AuditPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.audit')} /> }
+export function ProfilePage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.profile')} /> }

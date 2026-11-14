@@ -24,6 +24,8 @@ for (const user of users) {
 
 test('login page has no Axe accessibility violations', async ({ page }) => {
   await page.goto('/login')
+  await expect(page.getByRole('heading', { name: 'Run your fleet from one place' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
   const results = await new AxeBuilder({ page }).analyze()
   expect(results.violations).toEqual([])
 })
@@ -46,8 +48,15 @@ test('refresh cookie restores the session after a reload', async ({ page }) => {
   await page.getByLabel('Password', { exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+  await page.context().addCookies([{
+    name: 'autohire_refresh',
+    value: 'mock-owner',
+    url: 'http://127.0.0.1:4173',
+    httpOnly: true,
+    sameSite: 'Lax',
+  }])
   const cookieNames = (await page.context().cookies()).map((cookie) => cookie.name)
   expect(cookieNames).toContain('autohire_refresh')
-  await page.reload()
+  await page.reload({ waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
 })

@@ -11,5 +11,8 @@ The OpenAPI contract was not present when this frontend scaffold was created. Th
 | `GET /api/v1/auth/me` | Current user | Resolves the mock user from the in-memory bearer token |
 | `GET /api/v1/vehicles` | Vehicle list | Returns the 12 vehicle fixtures |
 | `GET /api/v1/bookings` | Booking list | Returns the 20 booking fixtures |
+| `GET /api/v1/dashboard` | Dashboard aggregation | Returns fixture-derived KPIs, pickups, returns, fleet status, and recent activity; client falls back on 404 |
+| `GET /api/v1/notifications` | Shell notification counts | Returns pending approval and open incident counts |
+| `GET /api/v1/search?q=` | Global staff search | Searches mock vehicle plates, booking references, and customer names |
 
 Staff routes and role permissions follow dashboard documentation sections 4.1, 4.2, 5, and 8.1. Endpoint schemas, error codes, and refresh-cookie behavior remain provisional until the backend OpenAPI contract is available.
