@@ -55,14 +55,12 @@ describe('admin rules', () => {
       </MemoryRouter>,
     )
 
-    await screen.findByText(/Approvals/)
+    const approveButtons = await screen.findAllByRole('button', { name: 'Approve' })
+    fireEvent.click(approveButtons[0])
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
     const paymentSelect = screen.getByLabelText(/payment method/i)
     const values = Array.from((paymentSelect as HTMLSelectElement).options).map((option) => option.value)
     expect(values).not.toContain('corporate')
-
-    fireEvent.click(screen.getAllByRole('button', { name: /approve/i })[0])
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
-    expect(screen.getByLabelText(/payment method/i)).toBeInTheDocument()
   })
 
   it('prevents manager from creating owner roles and blocks self-deactivation', async () => {
@@ -83,8 +81,11 @@ describe('admin rules', () => {
     )
 
     expect(screen.getByRole('heading', { name: /^Staff$/i, level: 1 })).toBeInTheDocument()
-    expect(screen.getByDisplayValue('owner')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /invite staff/i })).toBeInTheDocument()
+    const roleSelects = screen.getAllByRole('combobox', { name: 'Role' })
+    const inviteRoleSelect = roleSelects[roleSelects.length - 1] as HTMLSelectElement
+    await waitFor(() => expect(Array.from(inviteRoleSelect.options).map((option) => option.value)).not.toContain('owner'))
+    expect(screen.getByRole('button', { name: 'Invite staff' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Owner')).toBeInTheDocument()
   })
 
   it('keeps audit page owner-only', () => {

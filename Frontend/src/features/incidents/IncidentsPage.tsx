@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Clock3, MapPin, Wrench } from 'lucide-react'
 import { useBookings, useDispatchIncident, useIncidents, useNearestMechanics, useVehicles } from '../../api/queries'
@@ -7,7 +7,7 @@ import { Button, ConfirmDialog, Drawer, EmptyState, ErrorState, Select, Skeleton
 import { formatEat, formatKes } from '../../lib'
 import { toLeaflet } from '../../lib/geo'
 import { approxDistanceLabel } from './incidentGeo'
-import { GeoMap } from './GeoMap'
+import { LazyGeoMap } from './LazyGeoMap'
 import { SOSButton } from './SOSButton'
 
 const categoryLabels: Record<Incident['category'], string> = {
@@ -44,6 +44,16 @@ export function IncidentsPage() {
   const [replacementVehicleId, setReplacementVehicleId] = useState('')
   const [dispatchError, setDispatchError] = useState<string | null>(null)
   const [dispatching, setDispatching] = useState(false)
+  const [now, setNow] = useState<number | null>(null)
+
+  useEffect(() => {
+    const initialUpdate = window.setTimeout(() => setNow(Date.now()), 0)
+    const refreshInterval = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => {
+      window.clearTimeout(initialUpdate)
+      window.clearInterval(refreshInterval)
+    }
+  }, [])
   const incidents = incidentsQuery.data ?? []
   const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null
   const [latitude, longitude] = selectedIncident ? toLeaflet(selectedIncident.location) : [-1.2864, 36.8172]
@@ -53,7 +63,8 @@ export function IncidentsPage() {
   const availableVehicles = (vehiclesQuery.data ?? []).filter((vehicle) => vehicle.status === 'available')
   const affectedBookings = selectedIncident?.vehicleId
     ? (bookingsQuery.data ?? []).filter((booking) => booking.vehicleId === selectedIncident.vehicleId
-      && Date.parse(booking.returnAt) >= Date.now()
+      && now !== null
+      && Date.parse(booking.returnAt) >= now
       && !['cancelled', 'expired', 'completed'].includes(booking.status))
     : []
 
@@ -95,10 +106,10 @@ export function IncidentsPage() {
         <div className="incident-detail__status"><span className={`incident-status-chip incident-status-chip--${selectedIncident.status}`}>{selectedIncident.status.replaceAll('_', ' ')}</span><time><Clock3 aria-hidden="true" size={14} />{formatEat(selectedIncident.createdAt)}</time></div>
         <p>{selectedIncident.description || 'No description provided.'}</p>
         <p className="incident-detail__location"><MapPin aria-hidden="true" size={16} />{selectedIncident.locationText}</p>
-        <GeoMap center={selectedIncident.location} marker={{ point: selectedIncident.location, label: selectedIncident.locationText, tone: 'danger' }} zoom={14} />
+        <LazyGeoMap center={selectedIncident.location} marker={{ point: selectedIncident.location, label: selectedIncident.locationText, tone: 'danger' }} zoom={14} />
 
         <section className="incident-detail-section"><h3>Photos</h3>
-          {selectedIncident.photos.length ? <div className="incident-photo-grid">{selectedIncident.photos.map((photo, index) => <img alt={`Incident photo ${index + 1}`} key={`${photo.slice(0, 40)}-${index}`} src={photo} />)}</div> : <p>No photos attached.</p>}
+          {selectedIncident.photos.length ? <div className="incident-photo-grid">{selectedIncident.photos.map((photo, index) => <img alt={`Incident photo ${index + 1}`} decoding="async" height={480} key={`${photo.slice(0, 40)}-${index}`} loading="lazy" src={photo} width={640} />)}</div> : <p>No photos attached.</p>}
         </section>
 
         <section className="incident-detail-section"><h3><Wrench aria-hidden="true" size={16} />Nearest mechanics within 50 km</h3>

@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { AtSign, Camera, CarFront, Mail, MapPin, Menu, Phone, Smartphone, X } from 'lucide-react'
+import { AtSign, Camera, CarFront, Link2, Mail, MapPin, Menu, Phone, Smartphone, X } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
-import { t } from '../../i18n'
+import { useTranslation } from '../../i18n'
 import { APP_PROMO } from '../../features/home/homeConfig'
+import { company, openCompanyEmail } from '../../config/company'
 
 const publicLinks = [
   { to: '/', label: 'nav.home', end: true },
@@ -13,13 +14,14 @@ const publicLinks = [
 
 export function PublicLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { t, language, setLanguage } = useTranslation()
   return (
     <div className="public-layout">
       <header className="public-header">
         <div className="public-header__inner">
-          <Link aria-label={t('admin.brand')} className="brand" to="/">
+          <Link aria-label={company.name} className="brand" to="/">
             <span className="brand__mark"><CarFront aria-hidden="true" size={25} /></span>
-            <span className="brand__name">AutoHire <b>KE</b></span>
+            <span className="brand__name">{company.name}</span>
           </Link>
           <nav aria-label={t('nav.primary')} className={menuOpen ? 'public-nav is-open' : 'public-nav'}>
             {publicLinks.map(({ to, label, end }) => (
@@ -28,10 +30,17 @@ export function PublicLayout() {
               </NavLink>
             ))}
           </nav>
-          <a className="header-help" href={`tel:${t('footer.phoneValue').replace(/\D/g, '')}`}>
+          <a aria-label={`${t('nav.help')} ${company.phone}`} className="header-help" href={`tel:${company.phone.replace(/\D/g, '')}`}>
             <span className="header-help__icon"><Phone aria-hidden="true" size={18} /></span>
-            <span><small>{t('nav.help')}</small><strong>{t('footer.phoneValue')}</strong></span>
+            <span><small>{t('nav.help')}</small><strong>{company.phone}</strong></span>
           </a>
+          <label className="language-switcher">
+            <span className="sr-only">{t('language.label')}</span>
+            <select aria-label={t('language.label')} onChange={(event) => setLanguage?.(event.target.value as 'en' | 'sw')} value={language}>
+              <option value="en">{t('language.english')}</option>
+              <option value="sw">{t('language.swahili')}</option>
+            </select>
+          </label>
           <button aria-expanded={menuOpen} aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')} className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)} type="button">
             {menuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
@@ -43,22 +52,22 @@ export function PublicLayout() {
       <footer className="public-footer">
         <div className={APP_PROMO ? 'public-footer__main' : 'public-footer__main public-footer__main--no-app'}>
           <section className="footer-about">
-            <Link aria-label={t('admin.brand')} className="brand brand--footer" to="/">
+            <Link aria-label={company.name} className="brand brand--footer" to="/">
               <span className="brand__mark"><CarFront aria-hidden="true" size={24} /></span>
-              <span className="brand__name">AutoHire <b>KE</b></span>
+              <span className="brand__name">{company.name}</span>
             </Link>
             <p>{t('footer.tagline')}</p>
-            <div className="footer-social" aria-label={t('footer.social')}>
-              <a aria-label={t('footer.instagram')} href="https://instagram.com"><Camera size={18} /></a>
-              <a aria-label={t('footer.facebook')} href="https://facebook.com"><AtSign size={18} /></a>
-              <a aria-label={t('footer.email')} href={`mailto:${t('footer.emailValue')}`}><Mail size={18} /></a>
-            </div>
+            {Object.values(company.socialLinks).some(Boolean) && <div className="footer-social" aria-label={t('footer.social')}>
+              {company.socialLinks.instagram && <a aria-label={t('footer.instagram')} href={company.socialLinks.instagram}><Camera aria-hidden="true" size={18} /></a>}
+              {company.socialLinks.facebook && <a aria-label={t('footer.facebook')} href={company.socialLinks.facebook}><AtSign aria-hidden="true" size={18} /></a>}
+              {company.socialLinks.linkedin && <a aria-label={t('footer.linkedin')} href={company.socialLinks.linkedin}><Link2 aria-hidden="true" size={18} /></a>}
+            </div>}
           </section>
           <section className="footer-contact">
             <h2>{t('footer.address')}</h2>
-            <p><span className="footer-icon"><MapPin size={17} /></span>{t('footer.location')}</p>
-            <p><span className="footer-icon"><Mail size={17} /></span><a href={`mailto:${t('footer.emailValue')}`}>{t('footer.emailValue')}</a></p>
-            <p><span className="footer-icon"><Phone size={17} /></span><a href={`tel:${t('footer.phoneValue').replace(/\D/g, '')}`}>{t('footer.phoneValue')}</a></p>
+            <p><span className="footer-icon"><MapPin aria-hidden="true" size={17} /></span>{company.address}</p>
+            <p><span className="footer-icon"><Mail aria-hidden="true" size={17} /></span><button className="footer-email-action" onClick={openCompanyEmail} type="button">{t('footer.email')}</button></p>
+            <p><span className="footer-icon"><Phone aria-hidden="true" size={17} /></span><a href={`tel:${company.phone.replace(/\D/g, '')}`}>{company.phone}</a></p>
           </section>
           <section className="footer-links">
             <h2>{t('footer.links')}</h2>
@@ -76,7 +85,7 @@ export function PublicLayout() {
             <a className="app-badge" href="#download"><Smartphone size={19} /><span><small>{t('footer.getItOn')}</small><b>{t('footer.googlePlay')}</b></span></a>
           </section>}
         </div>
-        <div className="public-footer__bottom"><span>© {new Date().getFullYear()} {t('footer.copyright')}</span><span>{t('footer.tagline')}</span></div>
+        <div className="public-footer__bottom"><span>© {new Date().getFullYear()} {company.name}. {t('footer.copyright')}</span><span>{t('footer.tagline')}</span></div>
       </footer>
     </div>
   )

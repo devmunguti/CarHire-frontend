@@ -303,7 +303,9 @@ export function StaffPage() {
                 <Select
                   label="Role"
                   onChange={(event) => updateRole(row, event.target.value as UserRole)}
-                  options={roleChoices.map((option) => ({ value: option.value, label: option.label }))}
+                  options={(user?.role === 'manager' && row.role === 'owner'
+                    ? [...roleChoices, { value: 'owner' as const, label: 'Owner' }]
+                    : roleChoices).map((option) => ({ value: option.value, label: option.label }))}
                   value={row.role}
                 />
               ) },

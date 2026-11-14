@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, CheckCircle2, Clock3, RotateCw, Smartphone, XCircle } from 'lucide-react'
 import { ApiError, apiClient } from '../../api/client'
@@ -31,7 +31,7 @@ export function PaymentStatus({
   const deadline = useRef(0)
   const pollInFlight = useRef(false)
 
-  const applyStatus = useEffectEvent(async (id: string) => {
+  const applyStatus = useCallback(async (id: string) => {
     if (pollInFlight.current) return
     pollInFlight.current = true
     try {
@@ -57,7 +57,7 @@ export function PaymentStatus({
     } finally {
       pollInFlight.current = false
     }
-  })
+  }, [bookingId, onConfirmed, paymentState, queryClient])
 
   useEffect(() => {
     if (paymentState !== 'waiting' || !paymentId) return
@@ -71,7 +71,7 @@ export function PaymentStatus({
       if (remaining % 3 === 0) void applyStatus(paymentId)
     }, 1000)
     return () => window.clearInterval(timer)
-  }, [paymentId, paymentState])
+  }, [applyStatus, paymentId, paymentState])
 
   async function initiatePayment() {
     setError(null)

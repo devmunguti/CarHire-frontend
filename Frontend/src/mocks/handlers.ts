@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { bookings, DEMO_PASSWORD, drivers, incidents, mechanics, maintenanceWindows, users, vehicles } from './fixtures'
 import { buildDashboardData, getPendingApprovalCount, searchFixtures } from '../features/dashboard/dashboardData'
-import type { Booking, BookingCreateRequest, DriverTripStatus, HandoverRequest, HandoverSettlement, PaymentMethod, QuoteRequest, QuoteResponse, StkInitiation, StkStatus, Vehicle } from '../api/types'
+import type { Booking, BookingCreateRequest, BookingPayment, DriverTripStatus, GuestBookingAccess, GuestBookingSummary, GuestCheckoutData, HandoverRequest, HandoverSettlement, PaymentMethod, QuoteRequest, QuoteResponse, StkInitiation, StkStatus, Vehicle } from '../api/types'
 import { getDriverEligibilityReason } from '../features/drivers/driverRules'
 import type { Incident, IncidentCreateRequest, IncidentDispatchType, Mechanic, MechanicCreateRequest } from '../api/types'
 import { getNearestMechanics } from '../features/incidents/incidentGeo'
@@ -11,7 +11,8 @@ let networkAttempts = 0
 const bookingStore: Booking[] = [...bookings]
 const incidentStore: Incident[] = [...incidents]
 const mechanicStore: Mechanic[] = [...mechanics]
-const stkAttempts = new Map<string, { bookingId: string; phone: string; amountKes: number; polls: number; createdAt: number }>()
+const stkAttempts = new Map<string, { paymentId: string; bookingId: string; phone: string; amountKes: number; polls: number; createdAt: number }>()
+const guestAccessTokens = new Map<string, string>()
 let driverRotationIndex = 0
 
 const blockingStatuses = new Set(['reserved', 'confirmed', 'checked_out', 'overdue'])
@@ -73,6 +74,13 @@ export const handlers = [
   http.get('/api/v1/health', () =>
     HttpResponse.json({ success: true, data: { status: 'ok' }, error: null }),
   ),
+  http.post('/contact', async ({ request }) => {
+    const body = await request.json() as { name?: string; email?: string; phone?: string; message?: string }
+    if (!body.name || !body.email || !body.phone || !body.message) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_CONTACT', message: 'Please complete all contact fields' } }, { status: 400 })
+    }
+    return HttpResponse.json({ success: true, data: { received: true }, error: null }, { status: 201 })
+  }),
   http.get('/api/v1/vehicles', ({ request }) => {
     const url = new URL(request.url)
     const pickupAt = url.searchParams.get('from') ?? ''
@@ -203,6 +211,109 @@ export const handlers = [
     if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
     return HttpResponse.json({ success: true, data: booking, error: null })
   }),
+  http.get('/api/v1/bookings/:id/checkout', ({ params }) => {
+    const booking = bookingStore.find((item) => item.id === params.id && item.status === 'reserved')
+    if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
+    const vehicle = vehicles.find((item) => item.id === booking.vehicleId)
+    if (!vehicle) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
+    const data: GuestCheckoutData = {
+      booking: {
+        id: booking.id, reference: booking.reference, vehicleId: booking.vehicleId, status: booking.status,
+        pendingApproval: booking.pendingApproval, pickupAt: booking.pickupAt, returnAt: booking.returnAt,
+        totalKes: booking.totalKes, mode: booking.mode, paymentMethod: booking.paymentMethod,
+        holdExpiresAt: booking.holdExpiresAt, pricingSnapshot: booking.pricingSnapshot,
+      },
+      vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, registration: vehicle.registration, ratePerDay: vehicle.ratePerDay },
+    }
+    return HttpResponse.json({ success: true, data, error: null })
+  }),
+  http.post('/api/v1/bookings/:id/checkout', async ({ params, request }) => {
+    const index = bookingStore.findIndex((item) => item.id === params.id && item.status === 'reserved')
+    if (index < 0) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
+    const booking = bookingStore[index]
+    if (booking.holdExpiresAt && Date.parse(booking.holdExpiresAt) <= Date.now()) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'HOLD_EXPIRED', message: 'The booking hold has expired' } }, { status: 409 })
+    }
+    let form: FormData
+    try {
+      form = await request.formData()
+    } catch {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_FORM', message: 'Complete the booking form and try again.' } }, { status: 400 })
+    }
+    const name = String(form.get('name') ?? '').trim()
+    const phone = String(form.get('phone') ?? '')
+    const email = String(form.get('email') ?? '').trim()
+    const idNumber = String(form.get('idNumber') ?? '').trim()
+    const paymentMethod = String(form.get('paymentMethod') ?? '')
+    const termsAccepted = form.get('termsAccepted') === 'true'
+    const rulesAccepted = form.get('rulesAccepted') === 'true'
+    if (name.length < 2 || !/^254[17]\d{8}$/.test(phone) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || idNumber.length < 4 || !termsAccepted || !rulesAccepted || !['mpesa_online', 'cash'].includes(paymentMethod)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_CHECKOUT', message: 'Check your details, accept the terms and rental rules, then try again.' } }, { status: 400 })
+    }
+    if (booking.mode === 'self_drive') {
+      const file = form.get('licence')
+      if (!(file instanceof File) || !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+        return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_LICENCE', message: 'Upload a JPG, PNG, WebP, or PDF licence file up to 5 MB.' } }, { status: 400 })
+      }
+    }
+    const method = paymentMethod as PaymentMethod
+    const updated: Booking = {
+      ...booking,
+      customerName: name,
+      customerPhone: phone,
+      customerEmail: email,
+      customerIdNumber: idNumber,
+      paymentMethod: method,
+      pendingApproval: method === 'cash',
+    }
+    bookingStore[index] = updated
+    const accessToken = `mock-signed-${crypto.randomUUID()}`
+    guestAccessTokens.set(accessToken, updated.id)
+    const vehicle = vehicles.find((item) => item.id === updated.vehicleId)!
+    const data: GuestBookingAccess = {
+      booking: {
+        id: updated.id, reference: updated.reference, vehicleId: updated.vehicleId, customerName: updated.customerName,
+        customerPhone: updated.customerPhone, status: updated.status, pendingApproval: updated.pendingApproval,
+        pickupAt: updated.pickupAt, returnAt: updated.returnAt, totalKes: updated.totalKes, mode: updated.mode,
+        paymentMethod: updated.paymentMethod, pricingSnapshot: updated.pricingSnapshot, payments: updated.payments,
+      },
+      vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, registration: vehicle.registration },
+      accessToken,
+      cancellationAllowed: Date.parse(updated.pickupAt) - Date.now() >= 48 * 60 * 60 * 1000,
+    }
+    return HttpResponse.json({ success: true, data, error: null }, { status: 201 })
+  }),
+  http.get('/api/v1/bookings/:ref/guest', ({ params, request }) => {
+    const token = request.headers.get('X-Booking-Access-Token')
+    const bookingId = token ? guestAccessTokens.get(token) : undefined
+    const booking = bookingId && bookingStore.find((item) => item.id === bookingId && item.reference === params.ref)
+    if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'GUEST_ACCESS_INVALID', message: 'Booking link unavailable' } }, { status: 404 })
+    const vehicle = vehicles.find((item) => item.id === booking.vehicleId)
+    if (!vehicle) return HttpResponse.json({ success: false, data: null, error: { code: 'GUEST_ACCESS_INVALID', message: 'Booking link unavailable' } }, { status: 404 })
+    const data: GuestBookingSummary = {
+      booking: {
+        id: booking.id, reference: booking.reference, vehicleId: booking.vehicleId, customerName: booking.customerName,
+        customerPhone: booking.customerPhone, status: booking.status, pendingApproval: booking.pendingApproval,
+        pickupAt: booking.pickupAt, returnAt: booking.returnAt, totalKes: booking.totalKes, mode: booking.mode,
+        paymentMethod: booking.paymentMethod, pricingSnapshot: booking.pricingSnapshot, payments: booking.payments,
+      },
+      vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, registration: vehicle.registration },
+      cancellationAllowed: Date.parse(booking.pickupAt) - Date.now() >= 48 * 60 * 60 * 1000,
+    }
+    return HttpResponse.json({ success: true, data, error: null })
+  }),
+  http.post('/api/v1/bookings/:ref/cancel', ({ params, request }) => {
+    const token = request.headers.get('X-Booking-Access-Token')
+    const bookingId = token ? guestAccessTokens.get(token) : undefined
+    const index = bookingId ? bookingStore.findIndex((item) => item.id === bookingId && item.reference === params.ref) : -1
+    const booking = bookingStore[index]
+    if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'GUEST_ACCESS_INVALID', message: 'Booking link unavailable' } }, { status: 404 })
+    if (Date.parse(booking.pickupAt) - Date.now() < 48 * 60 * 60 * 1000 || ['completed', 'cancelled'].includes(booking.status)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'CANCELLATION_UNAVAILABLE', message: 'This booking can no longer be cancelled online.' } }, { status: 409 })
+    }
+    bookingStore[index] = { ...booking, status: 'cancelled', pendingApproval: false }
+    return HttpResponse.json({ success: true, data: { cancelled: true }, error: null })
+  }),
   http.post('/api/v1/bookings/:id/driver', async ({ params, request }) => {
     const index = bookingStore.findIndex((booking) => booking.id === params.id)
     if (index < 0) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
@@ -307,10 +418,13 @@ export const handlers = [
   http.post('/api/v1/bookings/:id/payments/stk', async ({ params, request }) => {
     const booking = bookingStore.find((item) => item.id === params.id)
     if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
+    if (booking.status === 'reserved' && booking.holdExpiresAt && Date.parse(booking.holdExpiresAt) <= Date.now()) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'HOLD_EXPIRED', message: 'The booking hold has expired' } }, { status: 409 })
+    }
     const body = await request.json() as { phone: string; amountKes: number }
     if (!/^254[17]\d{8}$/.test(body.phone)) return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_PHONE', message: 'Enter a valid Kenyan mobile number' } }, { status: 400 })
     const paymentId = `stk-${Date.now()}`
-    stkAttempts.set(paymentId, { bookingId: booking.id, phone: body.phone, amountKes: body.amountKes, polls: 0, createdAt: Date.now() })
+    stkAttempts.set(paymentId, { paymentId, bookingId: booking.id, phone: body.phone, amountKes: body.amountKes, polls: 0, createdAt: Date.now() })
     const maskedPhone = `${body.phone.slice(0, 4)}XX XXX ${body.phone.slice(-3)}`
     const result: StkInitiation = { paymentId, maskedPhone }
     return HttpResponse.json({ success: true, data: result, error: null }, { status: 201 })
@@ -331,7 +445,15 @@ export const handlers = [
     else if (attempt.polls >= 1) {
       outcome = 'confirmed'
       paidAmountKes = finalDigit === '8' ? Math.max(0, attempt.amountKes - 100) : attempt.amountKes
-      if (booking) bookingStore[bookingStore.findIndex((item) => item.id === booking.id)] = { ...booking, status: 'confirmed', pendingApproval: false }
+      if (booking) {
+        const payment: BookingPayment = {
+          id: attempt.paymentId, method: 'mpesa_online', amountKes: paidAmountKes,
+          status: 'paid', reference: attempt.paymentId, createdAt: new Date().toISOString(),
+        }
+        bookingStore[bookingStore.findIndex((item) => item.id === booking.id)] = {
+          ...booking, status: 'confirmed', pendingApproval: false, payments: [...(booking.payments ?? []), payment],
+        }
+      }
     }
     const result: StkStatus = { outcome, amountDueKes: booking.totalKes, paidAmountKes, message }
     return HttpResponse.json({ success: true, data: result, error: null })

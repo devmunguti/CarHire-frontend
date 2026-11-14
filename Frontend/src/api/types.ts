@@ -229,6 +229,21 @@ export interface Booking {
   accruedLateFeeKes?: number
 }
 
+export interface GuestCheckoutData {
+  booking: Pick<Booking, 'id' | 'reference' | 'vehicleId' | 'status' | 'pendingApproval' | 'pickupAt' | 'returnAt' | 'totalKes' | 'mode' | 'paymentMethod' | 'holdExpiresAt' | 'pricingSnapshot'>
+  vehicle: Pick<Vehicle, 'id' | 'make' | 'model' | 'registration' | 'ratePerDay'>
+}
+
+export interface GuestBookingSummary {
+  booking: Pick<Booking, 'id' | 'reference' | 'vehicleId' | 'customerName' | 'customerPhone' | 'status' | 'pendingApproval' | 'pickupAt' | 'returnAt' | 'totalKes' | 'mode' | 'paymentMethod' | 'pricingSnapshot' | 'payments'>
+  vehicle: Pick<Vehicle, 'id' | 'make' | 'model' | 'registration'>
+  cancellationAllowed: boolean
+}
+
+export interface GuestBookingAccess extends GuestBookingSummary {
+  accessToken: string
+}
+
 export interface ApiEnvelope<T> {
   success: boolean
   data?: T

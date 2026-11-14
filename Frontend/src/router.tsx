@@ -14,10 +14,11 @@ void homePageModule.catch(() => undefined)
 const HomePage = lazy(() => homePageModule.then((module) => ({ default: module.HomePage })))
 const VehiclesPage = lazy(() => import('./pages/public').then((module) => ({ default: module.VehiclesPage })))
 const VehicleDetailsPage = lazy(() => import('./pages/public').then((module) => ({ default: module.VehicleDetailsPage })))
-const AboutPage = lazy(() => import('./pages/public').then((module) => ({ default: module.AboutPage })))
-const ContactPage = lazy(() => import('./pages/public').then((module) => ({ default: module.ContactPage })))
-const CheckoutPage = lazy(() => import('./pages/public').then((module) => ({ default: module.CheckoutPage })))
-const BookingPage = lazy(() => import('./pages/public').then((module) => ({ default: module.BookingPage })))
+const AboutPage = lazy(() => import('./features/about/AboutPage').then((module) => ({ default: module.AboutPage })))
+const ContactPage = lazy(() => import('./features/contact/ContactPage').then((module) => ({ default: module.ContactPage })))
+const CheckoutPage = lazy(() => import('./features/bookings/GuestCheckoutPage').then((module) => ({ default: module.GuestCheckoutPage })))
+const BookingPage = lazy(() => import('./features/bookings/GuestCheckoutPage').then((module) => ({ default: module.GuestBookingPage })))
+const BookingConfirmationPage = lazy(() => import('./features/bookings/GuestCheckoutPage').then((module) => ({ default: () => <module.GuestBookingPage confirmation /> })))
 const LoginPage = lazy(() => import('./features/auth/LoginPage').then((module) => ({ default: module.LoginPage })))
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const FleetPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.FleetPage })))
@@ -65,7 +66,8 @@ export const router = createBrowserRouter([
       { path: '/vehicles/:id', element: page(VehicleDetailsPage) },
       { path: '/about', element: page(AboutPage) },
       { path: '/contact', element: page(ContactPage) },
-      { path: '/checkout', element: page(CheckoutPage) },
+      { path: '/checkout/:bookingId', element: page(CheckoutPage) },
+      { path: '/booking/:ref/confirmation', element: page(BookingConfirmationPage) },
       { path: '/booking/:ref', element: page(BookingPage) },
     ],
   },

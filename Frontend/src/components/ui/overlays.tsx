@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, type PropsWithChildren } from 'react'
+import { useEffect, useEffectEvent, useId, useRef, type PropsWithChildren } from 'react'
 import { X } from 'lucide-react'
 import { t } from '../../i18n'
 import { Button, IconButton } from './button'
@@ -13,22 +13,35 @@ type FrameProps = PropsWithChildren<{
 function OverlayFrame({ open, title, onClose, variant = 'modal', children }: FrameProps) {
   const frameRef = useRef<HTMLDivElement>(null)
   const titleId = useId()
+  const close = useEffectEvent(onClose)
 
   useEffect(() => {
     if (!open) return
     const previousFocus = document.activeElement as HTMLElement | null
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    frameRef.current?.focus()
+    const focusableSelector = 'button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [href], [tabindex]:not([tabindex="-1"])'
+    const focusableElements = () => [...(frameRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [])]
+      .filter((element) => !element.closest('[hidden], [aria-hidden="true"]'))
+    focusableElements()[0]?.focus()
+    if (!focusableElements().length) frameRef.current?.focus()
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') close()
       if (event.key === 'Tab' && frameRef.current) {
-        const focusable = frameRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [href], select:not(:disabled), [tabindex="0"]')
+        const focusable = focusableElements()
         const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+        const last = focusable.at(-1)
+        if (!first || !last) {
+          event.preventDefault()
+          frameRef.current.focus()
+        } else if (event.shiftKey && (document.activeElement === first || document.activeElement === frameRef.current)) {
+          event.preventDefault()
+          last.focus()
+        } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === frameRef.current)) {
+          event.preventDefault()
+          first.focus()
+        }
       }
     }
 
@@ -38,7 +51,7 @@ function OverlayFrame({ open, title, onClose, variant = 'modal', children }: Fra
       document.body.style.overflow = previousOverflow
       previousFocus?.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   if (!open) return null
   return (

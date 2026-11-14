@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Booking, PaymentMethod } from '../../api/types'
 import { useBookingList, useUpdateBooking, useVehicles } from '../../api/queries'
-import { Button, DataTable, EmptyState, ErrorState, PillTabs, Select, Skeleton, StatusChip } from '../../components/ui'
+import { Button, ConfirmDialog, DataTable, EmptyState, ErrorState, PillTabs, Select, Skeleton, StatusChip } from '../../components/ui'
 import { useCan } from '../../hooks/useCan'
 import { t } from '../../i18n'
 import { formatEat, formatKes } from '../../lib'
@@ -33,10 +33,12 @@ function BookingActions({ booking }: { booking: Booking }) {
   const canCreateBookings = useCan('bookings:create')
   const updateBooking = useUpdateBooking(booking.id)
   const [confirmCancel, setConfirmCancel] = useState(false)
+  const [confirmApprove, setConfirmApprove] = useState(false)
+  const [approvalError, setApprovalError] = useState(false)
   const actions = [<Link className="button button--ghost button--sm" key="view" to={`/admin/bookings/${booking.id}`}>{t('booking.view')}</Link>]
 
-  if (booking.status === 'reserved' && canApprove) {
-    actions.push(<Button key="approve" onClick={() => void updateBooking.mutateAsync({ status: 'confirmed', pendingApproval: false })} size="sm" variant="secondary">{t('booking.approve')}</Button>)
+  if (booking.status === 'reserved' && booking.pendingApproval && canApprove) {
+    actions.push(<Button key="approve" onClick={() => { setApprovalError(false); setConfirmApprove(true) }} size="sm" variant="secondary">{t('booking.approve')}</Button>)
   }
   if (booking.status === 'confirmed' && canHandover) {
     actions.push(<Link className="button button--secondary button--sm" key="checkout" to={`/admin/bookings/${booking.id}/check-out`}>{t('booking.checkOut')}</Link>)
@@ -47,6 +49,20 @@ function BookingActions({ booking }: { booking: Booking }) {
   return (
     <div className="booking-row-actions">
       {actions}
+      {confirmApprove && <ConfirmDialog
+        cancelLabel={t('booking.back')}
+        confirmLabel={t('booking.approveOffline')}
+        description={t('booking.approvalDescription')}
+        onCancel={() => setConfirmApprove(false)}
+        onConfirm={() => {
+          void updateBooking.mutateAsync({ status: 'confirmed', pendingApproval: false })
+            .then(() => setConfirmApprove(false))
+            .catch(() => setApprovalError(true))
+        }}
+        open
+        title={t('booking.approvalTitle')}
+      />}
+      {approvalError && <p role="alert">{t('booking.approvalError')}</p>}
       {canCreateBookings && ['reserved', 'confirmed'].includes(booking.status) && <>
         <Button onClick={() => setConfirmCancel(true)} size="sm" variant="ghost">{t('booking.cancel')}</Button>
         {confirmCancel && <div className="booking-cancel-confirm" role="group"><span>{t('booking.cancelConfirm')}</span><Button onClick={() => void updateBooking.mutateAsync({ status: 'cancelled' }).then(() => setConfirmCancel(false))} size="sm" variant="danger">{t('booking.confirmAction')}</Button><Button onClick={() => setConfirmCancel(false)} size="sm" variant="secondary">{t('booking.back')}</Button></div>}

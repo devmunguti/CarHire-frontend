@@ -1,16 +1,33 @@
-# React + Vite
+# AutoHire KE frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React, TypeScript, and Vite frontend for the AutoHire KE vehicle-rental pilot.
 
-Currently, two official plugins are available:
+## Requirements
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Node.js 20.19+ or 22.12+
+- npm
 
-## React Compiler
+## Run locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+From this directory:
 
-## Expanding the Oxlint configuration
+```powershell
+npm ci
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+The development server uses the MSW mock API by default. Set `VITE_USE_MOCKS=false` and `VITE_API_BASE_URL` to use a backend instead. The mock login accounts are listed in `src/mocks/fixtures.ts`; their shared demo password is `DEMO_PASSWORD` in that file and is for local development only.
+
+## Validation
+
+```powershell
+npm run type-check
+npm test
+npx playwright install chromium
+npm run test:e2e
+npm run build
+```
+
+## Pilot release checklist
+
+Review [API_GAPS.md](./docs/API_GAPS.md), provide the remaining assets and business details listed in [PLACEHOLDERS.md](./docs/PLACEHOLDERS.md), and complete/sign off the [real-phone checklist](./docs/MANUAL_PHONE_TEST.md). Do not tag a pilot release until the release owner has verified the checklist on a physical phone.

@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Booking, Vehicle } from '../../api/types'
-import { useBookingList, useMaintenanceWindows, useVehicles } from '../../api/queries'
+import { useBookingList, useIncidents, useMaintenanceWindows, useVehicles } from '../../api/queries'
 import { TimelinePage } from './TimelinePage'
 
 type MockTimelineProps = {
@@ -11,10 +11,12 @@ type MockTimelineProps = {
   items: { id: string | number; title?: string; kind: string }[]
   onCanvasClick: (groupId: string | number, time: number) => void
   onItemClick: (itemId: string | number) => void
+  onItemSelect: (itemId: string | number) => void
 }
 
 vi.mock('../../api/queries', () => ({
   useBookingList: vi.fn(),
+  useIncidents: vi.fn(),
   useMaintenanceWindows: vi.fn(),
   useVehicles: vi.fn(),
 }))
@@ -24,7 +26,7 @@ vi.mock('react-calendar-timeline', async () => {
   return {
     default: (props: MockTimelineProps) => createElement('div', { 'data-testid': 'mock-calendar' },
       createElement('button', { onClick: () => props.onCanvasClick(props.groups[0].id, Date.parse('2026-11-18T08:00:00.000Z')) }, 'Create from empty cell'),
-      ...props.items.filter((item) => item.kind === 'booking').map((item) => createElement('button', { key: item.id, onClick: () => props.onItemClick(item.id) }, item.title)),
+      ...props.items.filter((item) => item.kind === 'booking').map((item) => createElement('button', { key: item.id, onClick: () => props.onItemSelect(item.id) }, item.title)),
     ),
     DateHeader: () => null,
     SidebarHeader: () => null,
@@ -74,6 +76,7 @@ function renderTimeline() {
 
 beforeEach(() => {
   vi.mocked(useBookingList).mockReturnValue({ data: [booking], isLoading: false, isError: false, refetch: vi.fn() } as never)
+  vi.mocked(useIncidents).mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() } as never)
   vi.mocked(useVehicles).mockReturnValue({ data: [vehicle], isLoading: false, isError: false, refetch: vi.fn() } as never)
   vi.mocked(useMaintenanceWindows).mockReturnValue({ data: [], isLoading: false, isError: false, refetch: vi.fn() } as never)
 })
@@ -86,5 +89,12 @@ describe('fleet timeline interactions', () => {
     expect(query.get('vehicleId')).toBe('car-01')
     expect(query.get('pickupAt')).toBe('2026-11-18T08:00:00.000Z')
     expect(query.get('returnAt')).toBe('2026-11-19T08:00:00.000Z')
+  })
+
+  it('opens the booking drawer when a booking bar is selected', () => {
+    renderTimeline()
+    fireEvent.click(screen.getByRole('button', { name: /OVERDUE · BK-TEST-1/ }))
+    expect(screen.getByRole('dialog', { name: 'BK-TEST-1' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open booking' })).toHaveAttribute('href', '/admin/bookings/booking-test')
   })
 })

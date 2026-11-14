@@ -5,9 +5,10 @@ import type { MechanicType } from '../../api/types'
 import { Button, ErrorState, Input, Select, Skeleton, Toast } from '../../components/ui'
 import { useAuth } from '../../hooks/AuthContext'
 import { toGeoJson, toLeaflet, type GeoJsonPoint } from '../../lib/geo'
-import { GeoMap } from './GeoMap'
+import { LazyGeoMap } from './LazyGeoMap'
 
 const nairobiCenter = toGeoJson([-1.2864, 36.8172])
+const noMechanics: NonNullable<ReturnType<typeof useMechanics>['data']> = []
 const mechanicTypeLabels: Record<MechanicType, string> = {
   in_house: 'In-House',
   partner_garage: 'Partner Garage',
@@ -26,7 +27,7 @@ export function MechanicsPage() {
   const [toast, setToast] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const canAdd = user?.role === 'owner' || user?.role === 'manager'
-  const mechanics = mechanicsQuery.data ?? []
+  const mechanics = mechanicsQuery.data ?? noMechanics
   const counties = [...new Set(mechanics.map((mechanic) => mechanic.county))].sort()
   const specialties = [...new Set(mechanics.flatMap((mechanic) => mechanic.specialties))].sort()
   const visibleMechanics = useMemo(() => mechanics.filter((mechanic) =>
@@ -94,7 +95,7 @@ export function MechanicsPage() {
       <div className="mechanics-directory-layout">
         <div className="mechanics-map-wrap">
           {adding && <p className="mechanics-map-hint" role="status">{pin ? 'Pin placed. Click another location to move it.' : 'Click the map to place a pin.'}</p>}
-          <GeoMap center={mapCenter} marker={pin ? { point: pin, label: 'New mechanic location' } : undefined} mechanics={visibleMechanics} onMechanicSelect={setSelectedId} onPlace={setPin} placementEnabled={adding} selectedMechanicId={selectedId} />
+          <LazyGeoMap center={mapCenter} marker={pin ? { point: pin, label: 'New mechanic location' } : undefined} mechanics={visibleMechanics} onMechanicSelect={setSelectedId} onPlace={setPin} placementEnabled={adding} selectedMechanicId={selectedId} />
         </div>
         <aside aria-label="Mechanics list" className="mechanics-list-panel">
           <header><h3>Mechanics</h3><span>{visibleMechanics.length}</span></header>

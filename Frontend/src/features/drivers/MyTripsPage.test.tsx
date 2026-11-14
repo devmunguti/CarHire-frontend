@@ -5,7 +5,11 @@ import type { Booking } from '../../api/types'
 import { useMyDriverTrips, useUpdateDriverTripStatus } from '../../api/queries'
 import { MyTripsPage } from './MyTripsPage'
 
-vi.mock('../../api/queries', () => ({ useMyDriverTrips: vi.fn(), useUpdateDriverTripStatus: vi.fn() }))
+vi.mock('../../api/queries', () => ({
+  useCreateIncident: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })),
+  useMyDriverTrips: vi.fn(),
+  useUpdateDriverTripStatus: vi.fn(),
+}))
 vi.mock('../../hooks/AuthContext', () => ({ useAuth: () => ({ user: { id: 'usr-04', name: 'Peter Mwangi' }, logout: vi.fn() }) }))
 
 const ownTrip: Booking = {

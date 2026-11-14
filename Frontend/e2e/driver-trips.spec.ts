@@ -15,7 +15,7 @@ test('driver completes only their own trip on mobile', async ({ page }) => {
   const ownTrip = page.locator('.driver-trip-card').filter({ hasText: 'BK-2611-0013' })
   await expect(ownTrip).toBeVisible()
   await expect(page.getByText('BK-2611-0004')).toHaveCount(0)
-  await expect(ownTrip.getByRole('link', { name: 'Call customer' })).toHaveAttribute('href', /^tel:/)
+  await expect(ownTrip.getByRole('link', { name: /^Call / })).toHaveAttribute('href', /^tel:/)
   await expect(ownTrip.getByRole('link', { name: 'WhatsApp' })).toHaveAttribute('href', /^https:\/\/wa\.me\//)
   await expect(ownTrip.getByText('KDA 101A')).toBeVisible()
 

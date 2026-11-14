@@ -91,6 +91,23 @@ export function TimelinePage() {
         <span className="fleet-timeline-legend__maintenance"><i /><AlertTriangle aria-hidden="true" size={14} />Maintenance</span>
       </div>
 
+      <details className="fleet-timeline-alternative">
+        <summary>Keyboard-accessible bookings and vehicle actions</summary>
+        <ul>
+          {items.filter((item) => item.kind === 'booking' && item.bookingId).map((item) => {
+            const booking = bookings.find((entry) => entry.id === item.bookingId)
+            if (!booking) return null
+            return <li key={item.id}>
+              <button onClick={() => handleItemClick(item.id)} type="button">View booking {booking.reference}: {booking.status.replaceAll('_', ' ')}</button>
+              <span>{vehicles.find((vehicle) => vehicle.id === booking.vehicleId)?.registration ?? booking.vehicleId} · {formatEat(booking.pickupAt)}–{formatEat(booking.returnAt)}</span>
+            </li>
+          })}
+          {vehicles.map((vehicle) => <li key={`create-${vehicle.id}`}>
+            <Link to={buildBookingPrefillUrl(vehicle.id, rangeStart)}>Create booking for {vehicle.registration}</Link>
+          </li>)}
+        </ul>
+      </details>
+
       {isLoading && <Skeleton rows={5} />}
       {hasError && <ErrorState onRetry={() => { void bookingsQuery.refetch(); void vehiclesQuery.refetch(); void maintenanceQuery.refetch(); void incidentsQuery.refetch() }} retryLabel="Retry" title="Timeline data could not be loaded" />}
       {!isLoading && !hasError && vehicles.length === 0 && <EmptyState description="Add vehicles to see their bookings here." title="No vehicles found" />}
@@ -107,6 +124,7 @@ export function TimelinePage() {
           minZoom={7 * DAY_MS}
           onCanvasClick={handleCanvasClick}
           onItemClick={handleItemClick}
+          onItemSelect={handleItemClick}
           onTimeChange={(start, end, updateScrollCanvas) => {
             setVisibleRange({ start, end })
             updateScrollCanvas(start, end)

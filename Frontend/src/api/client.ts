@@ -79,9 +79,9 @@ async function request<T>(path: string, init: RequestInit = {}, canRefresh = tru
 }
 
 export const apiClient = {
-  get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
+  get: <T>(path: string, init: RequestInit = {}) => request<T>(path, init),
+  post: <T>(path: string, body?: unknown, init: RequestInit = {}) =>
+    request<T>(path, { ...init, method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
   upload: <T>(path: string, body: FormData, onProgress: (progress: number) => void) =>

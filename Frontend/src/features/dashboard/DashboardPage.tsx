@@ -79,7 +79,7 @@ function FleetStatus({ data }: { data: DashboardData['fleetStatus'] }) {
 function DashboardPanel({ title, icon, children, href }: { title: string; icon: ReactNode; children: ReactNode; href?: string }) {
   return (
     <section className="dashboard-panel">
-      <header><span className="dashboard-panel__title">{icon}{title}</span>{href && <Link aria-label={`${t('dashboard.viewBookings')}: ${title}`} to={href}><ArrowUpRight size={17} /></Link>}</header>
+      <header><h2 className="dashboard-panel__title">{icon}{title}</h2>{href && <Link aria-label={`${t('dashboard.viewBookings')}: ${title}`} to={href}><ArrowUpRight size={17} /></Link>}</header>
       {children}
     </section>
   )

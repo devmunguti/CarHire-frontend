@@ -35,7 +35,7 @@ export function DashboardKpiCard({
   }
 
   return (
-    <Link aria-label={`${title}, ${value}`} className={`dashboard-kpi-link${danger ? ' dashboard-kpi-link--danger' : ''}`} to={DASHBOARD_KPI_ROUTES[metricKey]}>
+    <Link className={`dashboard-kpi-link${danger ? ' dashboard-kpi-link--danger' : ''}`} to={DASHBOARD_KPI_ROUTES[metricKey]}>
       <KpiCard label={title} value={value} />
       {danger && <Badge tone="danger">{t('dashboard.overdueLabel')}</Badge>}
     </Link>

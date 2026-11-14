@@ -1,0 +1,369 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for components/layouts/PublicLayout.tsx</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="../../theme.js"></script>
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        
+        <label class="theme-select quiet">
+            Theme
+            <select id="themeSelect" autocomplete="off">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="legacy">Legacy</option>
+            </select>
+        </label>
+
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">components/layouts</a> PublicLayout.tsx</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">77.77% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>7/9</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">33.33% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>6/18</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">66.66% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>4/6</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">87.5% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>7/8</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line medium'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState } from 'react'
+import { AtSign, Camera, CarFront, Link2, Mail, MapPin, Menu, Phone, Smartphone, X } from 'lucide-react'
+import { Link, NavLink, Outlet } from 'react-router-dom'
+import { useTranslation } from '../../i18n'
+import { APP_PROMO } from '../../features/home/homeConfig'
+import { company, openCompanyEmail } from '../../config/company'
+&nbsp;
+const publicLinks = [
+  { to: '/', label: 'nav.home', end: true },
+  { to: '/vehicles', label: 'nav.vehicles' },
+  { to: '/about', label: 'nav.about' },
+  { to: '/contact', label: 'nav.contact' },
+]
+&nbsp;
+export function PublicLayout() {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const { t, language, setLanguage } = useTranslation()
+  return (
+    &lt;div className="public-layout"&gt;
+      &lt;header className="public-header"&gt;
+        &lt;div className="public-header__inner"&gt;
+          &lt;Link aria-label={company.name} className="brand" to="/"&gt;
+            &lt;span className="brand__mark"&gt;&lt;CarFront aria-hidden="true" size={25} /&gt;&lt;/span&gt;
+            &lt;span className="brand__name"&gt;{company.name}&lt;/span&gt;
+          &lt;/Link&gt;
+          &lt;nav aria-label={t('nav.primary')} className={menuOpen ? <span class="branch-0 cbranch-no" title="branch not covered" >'public-nav is-open' : '</span>public-nav'}&gt;
+            {publicLinks.map(({ to, label, end }) =&gt; (
+              &lt;NavLink end={end} key={to} <span class="fstat-no" title="function not covered" >onClick={() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etMenuOpen(false)} to={t</span>o}&gt;
+                {t(label)}
+              &lt;/NavLink&gt;
+            ))}
+          &lt;/nav&gt;
+          &lt;a className="header-help" href={`tel:${company.phone.replace(/\D/g, '')}`}&gt;
+            &lt;span className="header-help__icon"&gt;&lt;Phone aria-hidden="true" size={18} /&gt;&lt;/span&gt;
+            &lt;span&gt;&lt;small&gt;{t('nav.help')}&lt;/small&gt;&lt;strong&gt;{company.phone}&lt;/strong&gt;&lt;/span&gt;
+          &lt;/a&gt;
+          &lt;label className="language-switcher"&gt;
+            &lt;span className="sr-only"&gt;{t('language.label')}&lt;/span&gt;
+            &lt;select aria-label={t('language.label')} onChange={(event) =&gt; setLanguage?.(event.target.value as 'en' | 'sw')} value={language}&gt;
+              &lt;option value="en"&gt;{t('language.english')}&lt;/option&gt;
+              &lt;option value="sw"&gt;{t('language.swahili')}&lt;/option&gt;
+            &lt;/select&gt;
+          &lt;/label&gt;
+          &lt;button aria-expanded={menuOpen} aria-label={menuOpen ? <span class="branch-0 cbranch-no" title="branch not covered" >t('nav.closeMenu') : t</span>('nav.openMenu')} className="menu-toggle" <span class="fstat-no" title="function not covered" >onClick={() =&gt; <span class="cstat-no" title="statement not covered" >s</span>etMenuOpen(!menuOpen)} t</span>ype="button"&gt;
+            {menuOpen ? <span class="branch-0 cbranch-no" title="branch not covered" >&lt;X size={22} /&gt; : &lt;M</span>enu size={22} /&gt;}
+          &lt;/button&gt;
+        &lt;/div&gt;
+      &lt;/header&gt;
+&nbsp;
+      &lt;main className="public-main"&gt;&lt;Outlet /&gt;&lt;/main&gt;
+&nbsp;
+      &lt;footer className="public-footer"&gt;
+        &lt;div className={APP_PROMO ? <span class="branch-0 cbranch-no" title="branch not covered" >'public-footer__main' : '</span>public-footer__main public-footer__main--no-app'}&gt;
+          &lt;section className="footer-about"&gt;
+            &lt;Link aria-label={company.name} className="brand brand--footer" to="/"&gt;
+              &lt;span className="brand__mark"&gt;&lt;CarFront aria-hidden="true" size={24} /&gt;&lt;/span&gt;
+              &lt;span className="brand__name"&gt;{company.name}&lt;/span&gt;
+            &lt;/Link&gt;
+            &lt;p&gt;{t('footer.tagline')}&lt;/p&gt;
+            {Object.values(company.socialLinks).some(Boolean) &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >&lt;div className="footer-social" aria-label={t('footer.social')}&gt;</span>
+              {company.socialLinks.instagram &amp;&amp; &lt;a aria-label={t('footer.instagram')} href={company.socialLinks.instagram}&gt;&lt;Camera aria-hidden="true" size={18} /&gt;&lt;/a&gt;}
+              {company.socialLinks.facebook &amp;&amp; &lt;a aria-label={t('footer.facebook')} href={company.socialLinks.facebook}&gt;&lt;AtSign aria-hidden="true" size={18} /&gt;&lt;/a&gt;}
+              {company.socialLinks.linkedin &amp;&amp; &lt;a aria-label={t('footer.linkedin')} href={company.socialLinks.linkedin}&gt;&lt;Link2 aria-hidden="true" size={18} /&gt;&lt;/a&gt;}
+            &lt;/div&gt;}
+          &lt;/section&gt;
+          &lt;section className="footer-contact"&gt;
+            &lt;h2&gt;{t('footer.address')}&lt;/h2&gt;
+            &lt;p&gt;&lt;span className="footer-icon"&gt;&lt;MapPin aria-hidden="true" size={17} /&gt;&lt;/span&gt;{company.address}&lt;/p&gt;
+            &lt;p&gt;&lt;span className="footer-icon"&gt;&lt;Mail aria-hidden="true" size={17} /&gt;&lt;/span&gt;&lt;button className="footer-email-action" onClick={openCompanyEmail} type="button"&gt;{t('footer.email')}&lt;/button&gt;&lt;/p&gt;
+            &lt;p&gt;&lt;span className="footer-icon"&gt;&lt;Phone aria-hidden="true" size={17} /&gt;&lt;/span&gt;&lt;a href={`tel:${company.phone.replace(/\D/g, '')}`}&gt;{company.phone}&lt;/a&gt;&lt;/p&gt;
+          &lt;/section&gt;
+          &lt;section className="footer-links"&gt;
+            &lt;h2&gt;{t('footer.links')}&lt;/h2&gt;
+            {publicLinks.map(({ to, label }) =&gt; &lt;Link key={to} to={to}&gt;{t(label)}&lt;/Link&gt;)}
+          &lt;/section&gt;
+          &lt;section className="footer-vehicles"&gt;
+            &lt;h2&gt;{t('footer.vehicleList')}&lt;/h2&gt;
+            &lt;Link to="/vehicles"&gt;{t('footer.suvs')}&lt;/Link&gt;
+            &lt;Link to="/vehicles"&gt;{t('footer.sedans')}&lt;/Link&gt;
+            &lt;Link to="/vehicles"&gt;{t('footer.vans')}&lt;/Link&gt;
+          &lt;/section&gt;
+          {APP_PROMO &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >&lt;section className="footer-download"&gt;</span>
+            &lt;h2&gt;{t('footer.download')}&lt;/h2&gt;
+            &lt;a className="app-badge" href="#download"&gt;&lt;Smartphone size={19} /&gt;&lt;span&gt;&lt;small&gt;{t('footer.availableOn')}&lt;/small&gt;&lt;b&gt;{t('footer.appStore')}&lt;/b&gt;&lt;/span&gt;&lt;/a&gt;
+            &lt;a className="app-badge" href="#download"&gt;&lt;Smartphone size={19} /&gt;&lt;span&gt;&lt;small&gt;{t('footer.getItOn')}&lt;/small&gt;&lt;b&gt;{t('footer.googlePlay')}&lt;/b&gt;&lt;/span&gt;&lt;/a&gt;
+          &lt;/section&gt;}
+        &lt;/div&gt;
+        &lt;div className="public-footer__bottom"&gt;&lt;span&gt;© {new Date().getFullYear()} {company.name}. {t('footer.copyright')}&lt;/span&gt;&lt;span&gt;{t('footer.tagline')}&lt;/span&gt;&lt;/div&gt;
+      &lt;/footer&gt;
+    &lt;/div&gt;
+  )
+}</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-11-14T22:52:06.230Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    

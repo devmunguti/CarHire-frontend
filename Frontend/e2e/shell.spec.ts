@@ -6,7 +6,7 @@ test('public shell fits desktop width and shows primary routes', async ({ page }
   await page.setViewportSize({ width: 1440, height: 1000 })
   await page.goto('/')
   await expect(page.getByRole('link', { name: 'Vehicles', exact: true }).first()).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Experience the road like never before', level: 1 })).toBeVisible()
   await expect(page.getByRole('contentinfo')).toBeVisible()
   const dimensions = await page.locator('body').evaluate((element) => ({
     client: element.clientWidth,
@@ -57,8 +57,8 @@ test('driver navigation hides office-only links and exposes assigned trips', asy
   await page.getByLabel('Password', { exact: true }).fill(DEMO_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await expect(page).toHaveURL(/\/admin\/my-trips$/)
-  await expect(page.getByRole('navigation', { name: 'Staff navigation' }).getByRole('link', { name: 'My trips' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Staff navigation' }).getByRole('link', { name: 'Dashboard' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'My trips' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Staff navigation' })).toHaveCount(0)
 })
 
 test('Ctrl+K searches vehicle plates', async ({ page }) => {

@@ -26,5 +26,5 @@ test('staff logs an SOS and dispatches the nearest partner mechanic', async ({ p
   await page.getByRole('button', { name: 'Dispatch closest partner' }).click()
   await expect(page.getByRole('dialog', { name: 'Confirm dispatch' })).toBeVisible()
   await page.getByRole('button', { name: 'Confirm dispatch' }).click()
-  await expect(page.getByText('dispatched', { exact: true })).toBeVisible()
+  await expect(page.getByRole('dialog').getByText('dispatched', { exact: true })).toBeVisible()
 })

@@ -6,7 +6,7 @@ import { useVehicles } from '../../api/queries'
 import type { Vehicle } from '../../api/types'
 import { EmptyState, ErrorState, Input, Select, Skeleton } from '../../components/ui'
 import { formatKes, toUtc } from '../../lib'
-import { t } from '../../i18n'
+import { t, useTranslation } from '../../i18n'
 import { APP_PROMO, homeFacts } from './homeConfig'
 
 const bookingSchema = z.object({
@@ -148,6 +148,7 @@ function CitySearch() {
 }
 
 export function HomePage() {
+  useTranslation()
   const vehiclesQuery = useVehicles()
   const categories = [...new Set((vehiclesQuery.data ?? []).map((vehicle) => vehicle.category).filter((category): category is string => Boolean(category)))].sort()
   const featuredVehicles = (vehiclesQuery.data ?? []).filter((vehicle) => vehicle.status === 'available').slice(0, 6)

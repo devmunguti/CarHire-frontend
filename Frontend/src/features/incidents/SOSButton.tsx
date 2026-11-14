@@ -4,7 +4,7 @@ import { useCreateIncident } from '../../api/queries'
 import type { IncidentCategory, IncidentCreateRequest } from '../../api/types'
 import { Button, Input, Modal, Select } from '../../components/ui'
 import { toGeoJson, type GeoJsonPoint } from '../../lib/geo'
-import { GeoMap } from './GeoMap'
+import { LazyGeoMap } from './LazyGeoMap'
 
 const nairobiFallback = toGeoJson([-1.2864, 36.8172])
 const incidentCategories: { value: IncidentCategory; label: string }[] = [
@@ -104,7 +104,7 @@ export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: Incide
         <div className="sos-map-controls">
           <Button onClick={() => setManualPinMode(!manualPinMode)} type="button" variant={manualPinMode ? 'primary' : 'secondary'}><MapPin aria-hidden="true" size={16} />{manualPinMode ? 'Click map to place pin' : 'Place pin manually'}</Button>
         </div>
-        <GeoMap center={location ?? nairobiFallback} marker={location ? { point: location, label: locationText || 'Incident location', tone: 'danger' } : undefined} onPlace={(point) => { setLocation(point); setGpsState('denied') }} placementEnabled={manualPinMode || gpsState === 'denied'} zoom={13} />
+        <LazyGeoMap center={location ?? nairobiFallback} marker={location ? { point: location, label: locationText || 'Incident location', tone: 'danger' } : undefined} onPlace={(point) => { setLocation(point); setGpsState('denied') }} placementEnabled={manualPinMode || gpsState === 'denied'} zoom={13} />
         {(gpsState === 'denied' || manualPinMode) && <Input label="Location or landmark" onChange={(event) => setLocationText(event.target.value)} placeholder="Street, landmark or town" value={locationText} />}
         <div className="field"><span className="field__label">Photos</span><label className="sos-photo-picker"><Camera aria-hidden="true" size={17} /> Add photos<input accept="image/*" capture="environment" multiple onChange={onPhotos} type="file" /></label>{photos.map((photo) => <small key={`${photo.name}-${photo.lastModified}`}>{photo.name}</small>)}</div>
         {vehicleId && <label className="choice"><input checked={immobilising} onChange={(event) => setImmobilising(event.target.checked)} type="checkbox" /><span>Vehicle cannot be driven</span></label>}
