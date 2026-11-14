@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from './client'
 import { ApiError } from './client'
-import type { Booking, BookingCreateRequest, DashboardData, HealthStatus, NotificationCounts, QuoteRequest, QuoteResponse, SearchResult, Vehicle } from './types'
+import type { AvailableDriversResponse, Booking, BookingCreateRequest, DashboardData, Driver, DriverTripStatus, HealthStatus, MaintenanceWindow, NotificationCounts, QuoteRequest, QuoteResponse, SearchResult, Vehicle } from './types'
 import { buildDashboardData } from '../features/dashboard/dashboardData'
 
 export function useHealth() {
@@ -10,6 +10,14 @@ export function useHealth() {
 
 export function useVehicles() {
   return useQuery({ queryKey: ['vehicles'], queryFn: () => apiClient.get<Vehicle[]>('/vehicles') })
+}
+
+export function useMaintenanceWindows(from: string, to: string) {
+  return useQuery({
+    queryKey: ['maintenance-windows', from, to],
+    queryFn: () => apiClient.get<MaintenanceWindow[]>(`/maintenance-windows?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    enabled: Boolean(from && to),
+  })
 }
 
 export function useBookings() {
@@ -97,5 +105,49 @@ export function useGlobalSearch(query: string, enabled = true) {
     queryFn: () => apiClient.get<SearchResult[]>(`/search?q=${encodeURIComponent(search)}`),
     enabled: enabled && search.length >= 2,
     staleTime: 30_000,
+  })
+}
+
+export function useDrivers() {
+  return useQuery({ queryKey: ['drivers'], queryFn: () => apiClient.get<Driver[]>('/drivers') })
+}
+
+export function useAvailableDrivers(from: string, to: string, vehicleId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['drivers', 'available', from, to, vehicleId],
+    queryFn: () => apiClient.get<AvailableDriversResponse>(`/drivers/available?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&vehicleId=${encodeURIComponent(vehicleId)}`),
+    enabled: enabled && Boolean(from && to && vehicleId),
+  })
+}
+
+export function useMyDriverTrips() {
+  return useQuery({ queryKey: ['driver-trips'], queryFn: () => apiClient.get<Booking[]>('/drivers/me/trips') })
+}
+
+export function useAssignDriver(bookingId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (driverId: string) => apiClient.post<Booking>(`/bookings/${encodeURIComponent(bookingId)}/driver`, { driverId }),
+    onSuccess: async (booking) => {
+      queryClient.setQueryData(['booking', bookingId], booking)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['drivers'] }),
+        queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+      ])
+    },
+  })
+}
+
+export function useUpdateDriverTripStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ bookingId, status }: { bookingId: string; status: DriverTripStatus }) =>
+      apiClient.post<Booking>(`/bookings/${encodeURIComponent(bookingId)}/driver-status`, { status }),
+    onSuccess: async (booking) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['driver-trips'] }),
+        queryClient.invalidateQueries({ queryKey: ['booking', booking.id] }),
+      ])
+    },
   })
 }

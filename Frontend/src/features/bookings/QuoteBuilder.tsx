@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DriveMode, QuoteRequest, QuoteResponse } from '../../api/types'
+import type { DriveMode, DriverLocation, QuoteRequest, QuoteResponse } from '../../api/types'
 import { useCalculateQuote } from '../../api/queries'
-import { Button, Checkbox, DateTimeRangePicker, Input, Tabs } from '../../components/ui'
+import { Button, Checkbox, DateTimeRangePicker, Input, Select, Tabs } from '../../components/ui'
 import { formatKes } from '../../lib'
 import { t } from '../../i18n'
 
@@ -87,6 +87,12 @@ export function QuoteBuilder({
           options={[{ value: 'self_drive', label: t('booking.selfDrive') }, { value: 'chauffeur', label: t('booking.chauffeur') }]}
           value={request.mode}
         />
+        {request.mode === 'chauffeur' && <Select
+          label="Driver fee area"
+          onChange={(event) => update({ driverLocation: event.target.value as DriverLocation })}
+          options={[{ value: 'in_town', label: 'In-town' }, { value: 'upcountry', label: 'Upcountry' }]}
+          value={request.driverLocation ?? 'in_town'}
+        />}
         <fieldset className="quote-extras">
           <legend>{t('booking.extras')}</legend>
           {extraOptions.map(({ code, label }) => <Checkbox checked={request.extras.includes(code)} key={code} label={t(label)} onChange={(checked) => toggleExtra(code, checked)} />)}
@@ -104,10 +110,11 @@ export function QuoteBuilder({
 
 export function QuoteBreakdown({ quote }: { quote: QuoteResponse }) {
   const snapshot = quote.pricingSnapshot
+  const chauffeurFeeLabel = snapshot.driverLocation === 'upcountry' ? 'Upcountry driver fee' : 'In-town driver fee'
   return (
     <dl className="quote-breakdown">
       <div><dt>{t('booking.baseDays').replace('{days}', String(snapshot.baseDays))}</dt><dd>{formatKes(snapshot.baseAmountKes)}</dd></div>
-      {snapshot.chauffeurFeeKes > 0 && <div><dt>{t('booking.chauffeurFee')}</dt><dd>{formatKes(snapshot.chauffeurFeeKes)}</dd></div>}
+      {snapshot.chauffeurFeeKes > 0 && <div><dt>{chauffeurFeeLabel}</dt><dd>{formatKes(snapshot.chauffeurFeeKes)}</dd></div>}
       {snapshot.extras.map((extra) => <div key={extra.code}><dt>{t(extrasLabels[extra.code] ?? extra.label)}</dt><dd>{formatKes(extra.amountKes)}</dd></div>)}
       <div><dt>{t('booking.vat').replace('{rate}', String(snapshot.vatRate))}</dt><dd>{formatKes(snapshot.vatAmountKes)}</dd></div>
       <div className="quote-breakdown__total"><dt>{t('booking.totalDue')}</dt><dd>{formatKes(snapshot.totalDueKes)}</dd></div>

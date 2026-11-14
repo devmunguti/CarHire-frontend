@@ -84,4 +84,31 @@ export const apiClient = {
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  upload: <T>(path: string, body: FormData, onProgress: (progress: number) => void) =>
+    new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', `${API_BASE_URL}${path}`)
+      xhr.withCredentials = true
+      if (accessToken) xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`)
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100))
+      })
+      xhr.addEventListener('load', () => {
+        let envelope: ApiEnvelope<T>
+        try {
+          envelope = JSON.parse(xhr.responseText) as ApiEnvelope<T>
+        } catch {
+          reject(new ApiError('The server returned an invalid response', xhr.status))
+          return
+        }
+        if (xhr.status < 200 || xhr.status >= 300 || !envelope.success || envelope.data === undefined) {
+          reject(new ApiError(envelope.error?.message ?? 'The upload could not be completed', xhr.status, envelope.error?.code))
+          return
+        }
+        onProgress(100)
+        resolve(envelope.data)
+      })
+      xhr.addEventListener('error', () => reject(new ApiError('The upload could not be completed', xhr.status)))
+      xhr.send(body)
+    }),
 }

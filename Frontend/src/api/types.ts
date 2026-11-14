@@ -18,6 +18,9 @@ export type BookingStatus =
 
 export type DriveMode = 'self_drive' | 'chauffeur'
 export type PaymentMethod = 'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'
+export type DriverStatus = 'available' | 'assigned' | 'off_duty'
+export type DriverTripStatus = 'en_route_to_pickup' | 'customer_onboard' | 'trip_completed'
+export type DriverLocation = 'in_town' | 'upcountry'
 
 export interface QuoteLineItem {
   code: string
@@ -30,6 +33,7 @@ export interface PricingSnapshot {
   baseRateKes: number
   baseAmountKes: number
   chauffeurFeeKes: number
+  driverLocation?: DriverLocation
   extras: QuoteLineItem[]
   vatRate: 16
   vatAmountKes: number
@@ -43,6 +47,7 @@ export interface QuoteRequest {
   returnAt: string
   pickupLocation: string
   mode: DriveMode
+  driverLocation?: DriverLocation
   extras: string[]
 }
 
@@ -74,6 +79,44 @@ export interface BookingInspection {
   odometer: number
   fuelLevel: string
   createdAt: string
+  notes?: string
+  photos?: string[]
+  signatureConfirmed?: boolean
+  criticalDefect?: boolean
+}
+
+export interface HandoverRequest {
+  odometer: number
+  fuelLevel: string
+  notes: string
+  photos: string[]
+  signatureConfirmed: boolean
+  criticalDefect: boolean
+  completedAt: string
+}
+
+export interface HandoverSettlement {
+  graceHours: number
+  lateHours: number
+  lateFeeKes: number
+  odometerDifferenceKm: number
+  includedMileageKm: number
+  excessMileageKm: number
+  excessMileageRateKes: number
+  excessMileageChargeKes: number
+  totalKes: number
+}
+
+export interface StkInitiation {
+  paymentId: string
+  maskedPhone: string
+}
+
+export interface StkStatus {
+  outcome: 'pending' | 'confirmed' | 'failed' | 'manual_refund'
+  amountDueKes: number
+  paidAmountKes?: number
+  message?: string
 }
 
 export interface User {
@@ -82,6 +125,41 @@ export interface User {
   email: string
   phone: string
   role: UserRole
+  branch?: string
+  active?: boolean
+  lastLogin?: string
+}
+
+export interface Driver extends User {
+  role: 'driver'
+  status: DriverStatus
+  languages: string[]
+  licenceClass: string
+  licenceExpiresAt: string
+  psvExpiresAt: string
+  rating: number
+  currentTrip?: { bookingId: string; reference: string; pickupAt: string }
+}
+
+export interface AvailableDriversResponse {
+  drivers: Driver[]
+  autoAssignDriverId: string | null
+}
+
+export interface StaffMember extends User {
+  branch: string
+  active: boolean
+  lastLogin: string
+}
+
+export interface AuditEntry {
+  id: string
+  actor: string
+  action: string
+  entity: string
+  createdAt: string
+  before?: Record<string, unknown>
+  after?: Record<string, unknown>
 }
 
 export interface Vehicle {
@@ -94,6 +172,14 @@ export interface Vehicle {
   transmission: 'automatic' | 'manual'
   ratePerDay: number
   status: VehicleStatus
+}
+
+export interface MaintenanceWindow {
+  id: string
+  vehicleId: string
+  startAt: string
+  endAt: string
+  reason: string
 }
 
 export interface Booking {
@@ -118,6 +204,8 @@ export interface Booking {
   payments?: BookingPayment[]
   events?: BookingEvent[]
   driver?: User
+  vehicleRegistration?: string
+  driverTripStatus?: DriverTripStatus
   inspections?: BookingInspection[]
   auditEntries?: BookingEvent[]
   accruedLateFeeKes?: number

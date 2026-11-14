@@ -22,12 +22,12 @@ const FleetPage = lazy(() => import('./pages/admin').then((module) => ({ default
 const BookingsPage = lazy(() => import('./features/bookings/BookingsListPage').then((module) => ({ default: module.BookingsListPage })))
 const BookingWizardPage = lazy(() => import('./features/bookings/BookingWizard').then((module) => ({ default: module.BookingWizard })))
 const BookingDetailPage = lazy(() => import('./features/bookings/BookingDetailPage').then((module) => ({ default: module.BookingDetailPage })))
+const HandoverPage = lazy(() => import('./features/bookings/HandoverPage').then((module) => ({ default: module.HandoverPage })))
+const TimelinePage = lazy(() => import('./features/timeline/TimelinePage').then((module) => ({ default: module.TimelinePage })))
+const DriversPage = lazy(() => import('./features/drivers/DriversPage').then((module) => ({ default: module.DriversPage })))
+const MyTripsPage = lazy(() => import('./features/drivers/MyTripsPage').then((module) => ({ default: module.MyTripsPage })))
 const ApprovalsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.ApprovalsPage })))
-const HandoverPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.HandoverPage })))
-const TimelinePage = lazy(() => import('./pages/admin').then((module) => ({ default: module.TimelinePage })))
-const DriversPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.DriversPage })))
 const MechanicsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.MechanicsPage })))
-const MyTripsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.MyTripsPage })))
 const IncidentsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.IncidentsPage })))
 const StaffPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.StaffPage })))
 const AuditPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.AuditPage })))
@@ -73,6 +73,11 @@ export const router = createBrowserRouter([
   { path: '/403', element: <ForbiddenPage /> },
   { path: '/404', element: <NotFoundPage /> },
   {
+    path: '/admin/my-trips',
+    element: <ProtectedRoute roles={['driver']} />,
+    children: [{ index: true, element: page(MyTripsPage) }],
+  },
+  {
     path: '/admin',
     element: <ProtectedRoute roles={allRoles} />,
     children: [{
@@ -95,7 +100,6 @@ export const router = createBrowserRouter([
         { path: 'drivers', element: protectedPage(officeRoles, DriversPage) },
         { path: 'mechanics', element: protectedPage(mechanicsRoles, MechanicsPage) },
         { path: 'incidents', element: protectedPage(incidentRoles, IncidentsPage) },
-        { path: 'my-trips', element: protectedPage(['driver'], MyTripsPage) },
         { path: 'staff', element: protectedPage(['owner', 'manager'], StaffPage) },
         { path: 'audit', element: protectedPage(['owner'], AuditPage) },
         { path: 'profile', element: protectedPage(allRoles, ProfilePage) },

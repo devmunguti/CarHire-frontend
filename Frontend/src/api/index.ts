@@ -1,6 +1,6 @@
 export { ApiError, apiClient, getAccessToken, setAccessToken } from './client'
 export { getCurrentUser, login, logout } from './auth'
-export { useAvailableVehicles, useBookingDetail, useBookingList, useBookings, useCalculateQuote, useCreateBooking, useDashboard, useGlobalSearch, useHealth, useShellNotifications, useUpdateBooking, useVehicles } from './queries'
+export { useAssignDriver, useAvailableDrivers, useAvailableVehicles, useBookingDetail, useBookingList, useBookings, useCalculateQuote, useCreateBooking, useDashboard, useDrivers, useGlobalSearch, useHealth, useMaintenanceWindows, useMyDriverTrips, useShellNotifications, useUpdateBooking, useUpdateDriverTripStatus, useVehicles } from './queries'
 export type {
   ApiEnvelope,
   AuthSession,
@@ -11,6 +11,7 @@ export type {
   DashboardCardKey,
   DashboardActivity,
   Incident,
+  MaintenanceWindow,
   NotificationCounts,
   SearchResult,
   BookingCreateRequest,
@@ -22,6 +23,11 @@ export type {
   BookingEvent,
   BookingInspection,
   BookingPayment,
+  AvailableDriversResponse,
+  Driver,
+  DriverLocation,
+  DriverStatus,
+  DriverTripStatus,
   User,
   UserRole,
   Vehicle,

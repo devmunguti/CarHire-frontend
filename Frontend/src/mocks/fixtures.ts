@@ -1,14 +1,30 @@
-import type { Booking, BookingStatus, User, Vehicle } from '../api/types'
+import type { Booking, BookingStatus, Driver, MaintenanceWindow, User, Vehicle } from '../api/types'
 
 export const DEMO_PASSWORD = 'AutoHireDemo123!'
 
 export const users: User[] = [
-  { id: 'usr-01', name: 'Amina Njeri', email: 'amina@autohire.ke', phone: '254712345601', role: 'owner' },
-  { id: 'usr-02', name: 'Brian Otieno', email: 'brian@autohire.ke', phone: '254712345602', role: 'manager' },
-  { id: 'usr-03', name: 'Wanjiku Kamau', email: 'wanjiku@autohire.ke', phone: '254712345603', role: 'agent' },
-  { id: 'usr-04', name: 'Peter Mwangi', email: 'peter@autohire.ke', phone: '254112345604', role: 'driver' },
-  { id: 'usr-05', name: 'David Kiptoo', email: 'david@autohire.ke', phone: '254112345605', role: 'mechanic' },
+  { id: 'usr-01', name: 'Amina Njeri', email: 'amina@autohire.ke', phone: '254712345601', role: 'owner', branch: 'Nairobi HQ', active: true, lastLogin: '2026-11-14T07:40:00.000Z' },
+  { id: 'usr-02', name: 'Brian Otieno', email: 'brian@autohire.ke', phone: '254712345602', role: 'manager', branch: 'Mombasa Branch', active: true, lastLogin: '2026-11-14T08:05:00.000Z' },
+  { id: 'usr-03', name: 'Wanjiku Kamau', email: 'wanjiku@autohire.ke', phone: '254712345603', role: 'agent', branch: 'Nairobi West', active: true, lastLogin: '2026-11-14T06:55:00.000Z' },
+  { id: 'usr-04', name: 'Peter Mwangi', email: 'peter@autohire.ke', phone: '254112345604', role: 'driver', branch: 'Nairobi HQ', active: true, lastLogin: '2026-11-13T18:00:00.000Z' },
+  { id: 'usr-05', name: 'David Kiptoo', email: 'david@autohire.ke', phone: '254112345605', role: 'mechanic', branch: 'Nairobi HQ', active: true, lastLogin: '2026-11-14T05:15:00.000Z' },
 ]
+
+export const drivers: Driver[] = [
+  { ...users[3], role: 'driver', status: 'assigned', languages: ['English', 'Kiswahili'], licenceClass: 'B', licenceExpiresAt: '2027-11-14T00:00:00.000Z', psvExpiresAt: '2027-11-14T00:00:00.000Z', rating: 4.8, currentTrip: { bookingId: 'booking-07', reference: 'BK-2611-0007', pickupAt: '2026-11-07T06:00:00.000Z' } },
+  { id: 'drv-02', name: 'Grace Wanjiru', email: 'grace.driver@autohire.ke', phone: '254712345620', role: 'driver', status: 'assigned', languages: ['English', 'Kiswahili', 'Kikuyu'], licenceClass: 'B', licenceExpiresAt: '2028-04-30T00:00:00.000Z', psvExpiresAt: '2027-06-30T00:00:00.000Z', rating: 4.9, currentTrip: { bookingId: 'booking-04', reference: 'BK-2611-0004', pickupAt: '2026-11-04T06:00:00.000Z' } },
+  { id: 'drv-03', name: 'Samuel Muriuki', email: 'samuel.driver@autohire.ke', phone: '254712345621', role: 'driver', status: 'available', languages: ['English', 'Kiswahili'], licenceClass: 'C1', licenceExpiresAt: '2028-02-28T00:00:00.000Z', psvExpiresAt: '2027-08-31T00:00:00.000Z', rating: 4.6 },
+  { id: 'drv-06', name: 'Asha Njeri', email: 'asha.driver@autohire.ke', phone: '254712345624', role: 'driver', status: 'available', languages: ['English', 'Kiswahili'], licenceClass: 'B', licenceExpiresAt: '2028-06-30T00:00:00.000Z', psvExpiresAt: '2027-09-30T00:00:00.000Z', rating: 4.7 },
+  { id: 'drv-04', name: 'David Kiptoo', email: 'david.driver@autohire.ke', phone: '254712345622', role: 'driver', status: 'off_duty', languages: ['English', 'Kalenjin'], licenceClass: 'B', licenceExpiresAt: '2025-01-31T00:00:00.000Z', psvExpiresAt: '2027-03-31T00:00:00.000Z', rating: 4.2 },
+  { id: 'drv-05', name: 'Peter Kamau', email: 'peter.driver@autohire.ke', phone: '254712345623', role: 'driver', status: 'off_duty', languages: ['English', 'Kiswahili'], licenceClass: 'B', licenceExpiresAt: '2027-10-31T00:00:00.000Z', psvExpiresAt: '2025-03-31T00:00:00.000Z', rating: 4.4 },
+]
+
+export const staffMembers = users.map((user) => ({
+  ...user,
+  branch: user.branch ?? 'Nairobi HQ',
+  active: user.active ?? true,
+  lastLogin: user.lastLogin ?? '2026-11-10T09:00:00.000Z',
+}))
 
 export const customers = [
   { id: 'cus-01', name: 'Faith Wambui' },
@@ -34,9 +50,10 @@ export const vehicles: Vehicle[] = [
 ]
 
 const bookingStatuses: BookingStatus[] = [
-  'reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired',
-  'reserved', 'confirmed', 'checked_out', 'completed', 'reserved', 'overdue', 'cancelled',
-  'reserved', 'confirmed', 'checked_out', 'expired', 'completed', 'reserved',
+  'reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired', 'active',
+  'awaiting_approval', 'approved',
+  'reserved', 'confirmed', 'checked_out', 'confirmed', 'completed', 'reserved', 'overdue', 'cancelled',
+  'reserved', 'confirmed',
 ]
 
 export const bookings: Booking[] = bookingStatuses.map((status, index) => {
@@ -82,7 +99,7 @@ export const bookings: Booking[] = bookingStatuses.map((status, index) => {
     },
     payments: index % 4 === 0 ? [{ id: `pay-${index + 1}`, method: 'mpesa_manual', amountKes: 5000, status: 'pending', reference: `MP-${index + 1}`, createdAt: `2026-11-${day}T05:30:00.000Z` }] : [],
     events: [{ id: `evt-${index + 1}`, type: 'created', actor: user.name, note: 'Booking created', createdAt: `2026-11-${day}T05:00:00.000Z` }],
-    driver: mode === 'chauffeur' ? users.find((item) => item.role === 'driver') : undefined,
+    driver: mode === 'chauffeur' ? drivers[index % 2 === 0 ? 0 : 1] : undefined,
     inspections: [],
     auditEntries: [{ id: `audit-${index + 1}`, type: 'booking.created', actor: user.name, note: 'Booking record created', createdAt: `2026-11-${day}T05:00:00.000Z` }],
     accruedLateFeeKes: status === 'overdue' ? 1500 * (index + 1) : 0,
@@ -93,4 +110,39 @@ export const incidents = [
   { id: 'inc-01', reference: 'SOS-101', status: 'open' as const, description: 'Vehicle breakdown reported', createdAt: '2026-11-14T06:20:00.000Z' },
   { id: 'inc-02', reference: 'SOS-102', status: 'dispatched' as const, description: 'Mechanic dispatched', createdAt: '2026-11-14T07:15:00.000Z' },
   { id: 'inc-03', reference: 'SOS-103', status: 'resolved' as const, description: 'Incident resolved', createdAt: '2026-11-13T10:00:00.000Z' },
+]
+
+export const auditEntries = [
+  {
+    id: 'audit-01',
+    actor: 'Amina Njeri',
+    action: 'booking.approved',
+    entity: 'booking',
+    createdAt: '2026-11-14T08:12:00.000Z',
+    before: { status: 'reserved', paymentMethod: 'cash' },
+    after: { status: 'confirmed', paymentMethod: 'cash' },
+  },
+  {
+    id: 'audit-02',
+    actor: 'Brian Otieno',
+    action: 'staff.role_changed',
+    entity: 'staff',
+    createdAt: '2026-11-14T09:40:00.000Z',
+    before: { role: 'agent' },
+    after: { role: 'manager' },
+  },
+  {
+    id: 'audit-03',
+    actor: 'Amina Njeri',
+    action: 'vehicle.assigned',
+    entity: 'vehicle',
+    createdAt: '2026-11-13T16:00:00.000Z',
+    before: { vehicleId: 'car-04' },
+    after: { vehicleId: 'car-04', assignedTo: 'Wanjiku Kamau' },
+  },
+]
+
+export const maintenanceWindows: MaintenanceWindow[] = [
+  { id: 'maint-01', vehicleId: 'car-05', startAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), endAt: new Date(Date.now() + 30 * 60 * 60 * 1000).toISOString(), reason: 'Scheduled service' },
+  { id: 'maint-02', vehicleId: 'car-10', startAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), endAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(), reason: 'Inspection and repairs' },
 ]

@@ -15,3 +15,9 @@ export function formatKenyanPhone(value: string): string {
   if (!/^254[17]\d{8}$/.test(normalized)) return value
   return `0${normalized.slice(3, 6)} ${normalized.slice(6, 9)} ${normalized.slice(9)}`
 }
+
+export function maskKenyanPhone(value: string): string {
+  const normalized = normalisePhone(value)
+  if (!/^254[17]\d{8}$/.test(normalized)) return '254XX XXX XXX'
+  return `${normalized.slice(0, 4)}XX XXX ${normalized.slice(-3)}`
+}

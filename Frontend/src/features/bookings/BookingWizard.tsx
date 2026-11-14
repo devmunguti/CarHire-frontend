@@ -2,16 +2,17 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { ApiError, apiClient } from '../../api/client'
 import { useAvailableVehicles, useCreateBooking } from '../../api/queries'
-import type { DriveMode, QuoteRequest, QuoteResponse, Vehicle } from '../../api/types'
+import type { Booking, DriveMode, QuoteRequest, QuoteResponse, Vehicle } from '../../api/types'
 import { Button, DateTimeRangePicker, Input, PhoneInput, Select, Stepper } from '../../components/ui'
 import { useAuth } from '../../hooks/AuthContext'
 import { t } from '../../i18n'
 import { formatEat, formatKes, isKenyanPhone, normalisePhone } from '../../lib'
 import { QuoteBuilder, QuoteBreakdown } from './QuoteBuilder'
+import { PaymentStatus } from './PaymentStatus'
 
 const customerSchema = z.object({
   customerName: z.string().trim().min(2, t('booking.stepRequired')),
@@ -48,13 +49,22 @@ function VehiclePrice({ vehicle, request, onSelect, selected }: { vehicle: Vehic
 
 export function BookingWizard() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<DriveMode>('self_drive')
   const [paymentMethod, setPaymentMethod] = useState<'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'>('mpesa_online')
-  const [request, setRequest] = useState<QuoteRequest>({ vehicleId: '', pickupAt: '', returnAt: '', pickupLocation: '', mode: 'self_drive', extras: [] })
+  const [request, setRequest] = useState<QuoteRequest>(() => ({
+    vehicleId: searchParams.get('vehicleId') ?? '',
+    pickupAt: searchParams.get('pickupAt') ?? '',
+    returnAt: searchParams.get('returnAt') ?? '',
+    pickupLocation: '',
+    mode: 'self_drive',
+    extras: [],
+  }))
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
   const [conflict, setConflict] = useState(false)
+  const [paymentBooking, setPaymentBooking] = useState<Booking | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
   const form = useForm<CustomerValues>({ resolver: zodResolver(customerSchema), mode: 'onTouched', defaultValues: { customerName: '', customerPhone: '', customerEmail: '', customerIdNumber: '' } })
   const availableVehicles = useAvailableVehicles(request.pickupAt, request.returnAt)
@@ -99,7 +109,8 @@ export function BookingWizard() {
             paymentMethod,
             createdById: user?.id ?? '',
           })
-          navigate(`/admin/bookings/${booking.id}`)
+          if (paymentMethod === 'mpesa_online') setPaymentBooking(booking)
+          else navigate(`/admin/bookings/${booking.id}`)
         } catch (error) {
           if (error instanceof ApiError && error.status === 409) {
             setConflict(true)
@@ -121,12 +132,23 @@ export function BookingWizard() {
   return (
     <section className="booking-wizard">
       <header className="booking-wizard__header"><p>{t('booking.listTitle')}</p><h2>{t('booking.createFirst')}</h2></header>
-      <Stepper activeStep={step} steps={[
+      {!paymentBooking && <Stepper activeStep={step} steps={[
         t('booking.steps.customer'), t('booking.steps.dates'), t('booking.steps.vehicle'),
         t('booking.steps.extras'), t('booking.steps.review'),
-      ]} />
+      ]} />}
 
       <div className="booking-wizard__body">
+        {paymentBooking && <div className="booking-payment-step">
+          <h3>Reservation created</h3>
+          <p>Complete the M-Pesa request to confirm this booking.</p>
+          <PaymentStatus
+            amountDueKes={paymentBooking.totalKes}
+            bookingId={paymentBooking.id}
+            initialPhone={normalisePhone(form.getValues('customerPhone'))}
+            onConfirmed={() => navigate(`/admin/bookings/${paymentBooking.id}`)}
+          />
+        </div>}
+        {!paymentBooking && <>
         {step === 0 && <div className="booking-form-grid">
           <Input error={form.formState.errors.customerName?.message} label={t('booking.customerName')} {...form.register('customerName')} />
           <Controller control={form.control} name="customerPhone" render={({ field }) => <PhoneInput error={form.formState.errors.customerPhone?.message} label={t('booking.customerPhone')} onChange={field.onChange} value={field.value} />} />
@@ -172,14 +194,15 @@ export function BookingWizard() {
           ]} value={paymentMethod} />
           {conflict && <p className="quote-conflict" role="alert">{t('booking.reserveConflict')}</p>}
         </div>}
+        </>}
       </div>
 
-      <footer className="booking-wizard__actions">
+      {!paymentBooking && <footer className="booking-wizard__actions">
         <Button disabled={step === 0} onClick={() => setStep((current) => Math.max(0, current - 1))} variant="secondary">{t('booking.back')}</Button>
-        <Button disabled={createBooking.isPending || availableVehicles.isLoading || (step === 4 && !quote)} onClick={() => void continueStep()}>
+        <Button disabled={createBooking.isPending || availableVehicles.isLoading || (step >= 3 && !quote)} onClick={() => void continueStep()}>
           {step === 4 ? t(createBooking.isPending ? 'booking.calculating' : 'booking.create') : t('booking.next')}
         </Button>
-      </footer>
+      </footer>}
     </section>
   )
 }
