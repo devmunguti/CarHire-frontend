@@ -7,6 +7,7 @@ import type { Booking, DriverTripStatus } from '../../api/types'
 import { Button, ConfirmDialog, EmptyState, ErrorState, Skeleton } from '../../components/ui'
 import { useAuth } from '../../hooks/AuthContext'
 import { formatEat, formatKenyanPhone } from '../../lib'
+import { SOSButton } from '../incidents/SOSButton'
 
 const tripTransitions: { status: DriverTripStatus; label: string; previous?: DriverTripStatus }[] = [
   { status: 'en_route_to_pickup', label: 'En Route to Pickup' },
@@ -78,6 +79,7 @@ export function MyTripsPage() {
             </div>
             <Link className="driver-trip-handover" to={handoverPath}>Open handover inspection</Link>
             <div aria-label={`Status actions for ${booking.reference}`} className="driver-trip-actions">
+              <SOSButton source="driver" vehicleId={booking.vehicleId} />
               {tripTransitions.map((transition) => <Button
                 disabled={transition !== nextButton || updateStatus.isPending || booking.driverTripStatus === 'trip_completed'}
                 key={transition.status}

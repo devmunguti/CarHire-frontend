@@ -21,6 +21,10 @@ export type PaymentMethod = 'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 
 export type DriverStatus = 'available' | 'assigned' | 'off_duty'
 export type DriverTripStatus = 'en_route_to_pickup' | 'customer_onboard' | 'trip_completed'
 export type DriverLocation = 'in_town' | 'upcountry'
+export type MechanicType = 'in_house' | 'partner_garage' | 'towing'
+export type IncidentCategory = 'flat_tyre' | 'battery' | 'overheating' | 'accident' | 'strange_noise'
+export type IncidentStatus = 'open' | 'dispatching' | 'awaiting_replacement' | 'dispatched' | 'resolved'
+export type IncidentDispatchType = 'closest_partner' | 'in_house_rescue' | 'replacement_vehicle'
 
 export interface QuoteLineItem {
   code: string
@@ -166,6 +170,7 @@ export interface Vehicle {
   id: string
   make: string
   model: string
+  category?: string
   year: number
   registration: string
   seats: number
@@ -180,6 +185,19 @@ export interface MaintenanceWindow {
   startAt: string
   endAt: string
   reason: string
+}
+
+export interface Mechanic {
+  id: string
+  name: string
+  phone: string
+  whatsapp: string
+  county: string
+  town: string
+  type: MechanicType
+  specialties: string[]
+  callOutRateKes: number
+  location: { type: 'Point'; coordinates: [longitude: number, latitude: number] }
 }
 
 export interface Booking {
@@ -254,9 +272,34 @@ export interface DashboardData {
 export interface Incident {
   id: string
   reference: string
-  status: 'open' | 'dispatched' | 'en_route' | 'resolved'
+  status: IncidentStatus
   description: string
   createdAt: string
+  category: IncidentCategory
+  location: { type: 'Point'; coordinates: [longitude: number, latitude: number] }
+  locationText: string
+  vehicleId?: string
+  immobilising: boolean
+  photos: string[]
+  source: 'driver' | 'customer' | 'desk'
+  dispatch?: { type: IncidentDispatchType; mechanicId?: string; vehicleId?: string; createdAt: string }
+}
+
+export interface IncidentCreateRequest {
+  category: IncidentCategory
+  description: string
+  location: Incident['location']
+  locationText: string
+  vehicleId?: string
+  immobilising: boolean
+  photos: string[]
+  source: Incident['source']
+}
+
+export type MechanicCreateRequest = Omit<Mechanic, 'id'>
+
+export interface NearbyMechanic extends Mechanic {
+  distanceKm: number
 }
 
 export interface NotificationCounts {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type PropsWithChildren } from 'react'
+import { useEffect, useId, useRef, type PropsWithChildren } from 'react'
 import { X } from 'lucide-react'
 import { t } from '../../i18n'
 import { Button, IconButton } from './button'
@@ -12,6 +12,7 @@ type FrameProps = PropsWithChildren<{
 
 function OverlayFrame({ open, title, onClose, variant = 'modal', children }: FrameProps) {
   const frameRef = useRef<HTMLDivElement>(null)
+  const titleId = useId()
 
   useEffect(() => {
     if (!open) return
@@ -42,8 +43,8 @@ function OverlayFrame({ open, title, onClose, variant = 'modal', children }: Fra
   if (!open) return null
   return (
     <div className={`overlay overlay--${variant}`} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
-      <section aria-labelledby="overlay-title" aria-modal="true" className="overlay__panel" ref={frameRef} role="dialog" tabIndex={-1}>
-        <header className="overlay__header"><h2 id="overlay-title">{title}</h2><IconButton icon={<X size={18} />} label={t('styleguide.cancel')} onClick={onClose} /></header>
+      <section aria-labelledby={titleId} aria-modal="true" className="overlay__panel" ref={frameRef} role="dialog" tabIndex={-1}>
+        <header className="overlay__header"><h2 id={titleId}>{title}</h2><IconButton icon={<X size={18} />} label={t('styleguide.cancel')} onClick={onClose} /></header>
         {children}
       </section>
     </div>

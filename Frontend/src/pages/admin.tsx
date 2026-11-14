@@ -57,8 +57,6 @@ function formatHoldRemaining(value: string | undefined) {
 function DashboardPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.dashboard')} /> }
 function FleetPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.fleet')} /> }
 function BookingsPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.bookings')} /> }
-function MechanicsPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.mechanics')} /> }
-function IncidentsPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.incidents')} /> }
 function ProfilePage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.profile')} /> }
 
 export function ApprovalsPage() {
@@ -416,4 +414,4 @@ export function AuditPage() {
   )
 }
 
-export { DashboardPage, FleetPage, BookingsPage, MechanicsPage, IncidentsPage, ProfilePage }
+export { DashboardPage, FleetPage, BookingsPage, ProfilePage }

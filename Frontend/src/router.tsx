@@ -9,7 +9,9 @@ import { Skeleton } from './components/ui'
 import { t } from './i18n'
 import { ForbiddenPage, NotFoundPage } from './pages/AccessPages'
 
-const HomePage = lazy(() => import('./pages/public').then((module) => ({ default: module.HomePage })))
+const homePageModule = import('./features/home/HomePage')
+void homePageModule.catch(() => undefined)
+const HomePage = lazy(() => homePageModule.then((module) => ({ default: module.HomePage })))
 const VehiclesPage = lazy(() => import('./pages/public').then((module) => ({ default: module.VehiclesPage })))
 const VehicleDetailsPage = lazy(() => import('./pages/public').then((module) => ({ default: module.VehicleDetailsPage })))
 const AboutPage = lazy(() => import('./pages/public').then((module) => ({ default: module.AboutPage })))
@@ -26,9 +28,9 @@ const HandoverPage = lazy(() => import('./features/bookings/HandoverPage').then(
 const TimelinePage = lazy(() => import('./features/timeline/TimelinePage').then((module) => ({ default: module.TimelinePage })))
 const DriversPage = lazy(() => import('./features/drivers/DriversPage').then((module) => ({ default: module.DriversPage })))
 const MyTripsPage = lazy(() => import('./features/drivers/MyTripsPage').then((module) => ({ default: module.MyTripsPage })))
+const MechanicsPage = lazy(() => import('./features/incidents/MechanicsPage').then((module) => ({ default: module.MechanicsPage })))
+const IncidentsPage = lazy(() => import('./features/incidents/IncidentsPage').then((module) => ({ default: module.IncidentsPage })))
 const ApprovalsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.ApprovalsPage })))
-const MechanicsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.MechanicsPage })))
-const IncidentsPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.IncidentsPage })))
 const StaffPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.StaffPage })))
 const AuditPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.AuditPage })))
 const ProfilePage = lazy(() => import('./pages/admin').then((module) => ({ default: module.ProfilePage })))

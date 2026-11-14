@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import Timeline, { DateHeader, SidebarHeader, TimelineHeaders } from 'react-calendar-timeline'
 import 'react-calendar-timeline/style.css'
 import { AlertTriangle, CalendarDays, Clock3 } from 'lucide-react'
-import { useBookingList, useMaintenanceWindows, useVehicles } from '../../api/queries'
+import { useBookingList, useIncidents, useMaintenanceWindows, useVehicles } from '../../api/queries'
 import type { Booking } from '../../api/types'
 import { Button, Drawer, EmptyState, ErrorState, Skeleton } from '../../components/ui'
 import { formatEat, formatKes } from '../../lib'
@@ -39,9 +39,11 @@ export function TimelinePage() {
   const bookingsQuery = useBookingList(new URLSearchParams({ from, to }).toString())
   const vehiclesQuery = useVehicles()
   const maintenanceQuery = useMaintenanceWindows(from, to)
+  const incidentsQuery = useIncidents()
   const bookings = bookingsQuery.data ?? []
   const vehicles = vehiclesQuery.data ?? []
-  const items = buildTimelineItems(bookings, maintenanceQuery.data ?? [])
+  const incidents = incidentsQuery.data ?? []
+  const items = buildTimelineItems(bookings, maintenanceQuery.data ?? [], undefined, incidents)
   const groups = vehicles.map((vehicle) => ({
     id: vehicle.id,
     title: <span className="fleet-timeline__vehicle"><strong>{vehicle.registration}</strong><small>{vehicle.make} {vehicle.model}</small></span>,
@@ -62,12 +64,16 @@ export function TimelinePage() {
 
   function handleItemClick(itemId: string | number) {
     const item = items.find((entry) => entry.id === itemId)
+    if (item?.kind === 'incident_warning' && item.incidentId) {
+      navigate(`/admin/incidents?incidentId=${encodeURIComponent(item.incidentId)}`)
+      return
+    }
     if (item?.kind !== 'booking' || !item.bookingId) return
     setSelectedBooking(bookings.find((booking) => booking.id === item.bookingId) ?? null)
   }
 
-  const isLoading = bookingsQuery.isLoading || vehiclesQuery.isLoading || maintenanceQuery.isLoading
-  const hasError = bookingsQuery.isError || vehiclesQuery.isError || maintenanceQuery.isError
+  const isLoading = bookingsQuery.isLoading || vehiclesQuery.isLoading || maintenanceQuery.isLoading || incidentsQuery.isLoading
+  const hasError = bookingsQuery.isError || vehiclesQuery.isError || maintenanceQuery.isError || incidentsQuery.isError
 
   return (
     <section className="fleet-timeline-page">
@@ -86,7 +92,7 @@ export function TimelinePage() {
       </div>
 
       {isLoading && <Skeleton rows={5} />}
-      {hasError && <ErrorState onRetry={() => { void bookingsQuery.refetch(); void vehiclesQuery.refetch(); void maintenanceQuery.refetch() }} retryLabel="Retry" title="Timeline data could not be loaded" />}
+      {hasError && <ErrorState onRetry={() => { void bookingsQuery.refetch(); void vehiclesQuery.refetch(); void maintenanceQuery.refetch(); void incidentsQuery.refetch() }} retryLabel="Retry" title="Timeline data could not be loaded" />}
       {!isLoading && !hasError && vehicles.length === 0 && <EmptyState description="Add vehicles to see their bookings here." title="No vehicles found" />}
       {!isLoading && !hasError && vehicles.length > 0 && <div className="fleet-timeline-scroll" data-testid="fleet-timeline">
         <Timeline<FleetTimelineItem>

@@ -1,4 +1,4 @@
-import type { Booking, BookingStatus, Driver, MaintenanceWindow, User, Vehicle } from '../api/types'
+import type { Booking, BookingStatus, Driver, Incident, MaintenanceWindow, Mechanic, User, Vehicle } from '../api/types'
 
 export const DEMO_PASSWORD = 'AutoHireDemo123!'
 
@@ -106,10 +106,19 @@ export const bookings: Booking[] = bookingStatuses.map((status, index) => {
   }
 })
 
-export const incidents = [
-  { id: 'inc-01', reference: 'SOS-101', status: 'open' as const, description: 'Vehicle breakdown reported', createdAt: '2026-11-14T06:20:00.000Z' },
-  { id: 'inc-02', reference: 'SOS-102', status: 'dispatched' as const, description: 'Mechanic dispatched', createdAt: '2026-11-14T07:15:00.000Z' },
-  { id: 'inc-03', reference: 'SOS-103', status: 'resolved' as const, description: 'Incident resolved', createdAt: '2026-11-13T10:00:00.000Z' },
+export const mechanics: Mechanic[] = [
+  { id: 'mech-01', name: 'Central Rescue Team', phone: '254700111001', whatsapp: '254700111001', county: 'Nairobi', town: 'CBD', type: 'in_house', specialties: ['battery', 'overheating', 'flat_tyre'], callOutRateKes: 0, location: { type: 'Point', coordinates: [36.8219, -1.2921] } },
+  { id: 'mech-02', name: 'Kilimani Auto Care', phone: '254700111002', whatsapp: '254700111002', county: 'Nairobi', town: 'Kilimani', type: 'partner_garage', specialties: ['battery', 'strange_noise'], callOutRateKes: 2500, location: { type: 'Point', coordinates: [36.787, -1.2928] } },
+  { id: 'mech-03', name: 'Westlands Motor Clinic', phone: '254700111003', whatsapp: '254700111003', county: 'Nairobi', town: 'Westlands', type: 'partner_garage', specialties: ['overheating', 'accident'], callOutRateKes: 3500, location: { type: 'Point', coordinates: [36.804, -1.263] } },
+  { id: 'mech-04', name: 'Rapid Tow Nairobi', phone: '254700111004', whatsapp: '254700111004', county: 'Nairobi', town: 'Industrial Area', type: 'towing', specialties: ['accident', 'flat_tyre'], callOutRateKes: 5000, location: { type: 'Point', coordinates: [36.85, -1.314] } },
+  { id: 'mech-05', name: 'Ngara Roadside Assist', phone: '254700111005', whatsapp: '254700111005', county: 'Nairobi', town: 'Ngara', type: 'partner_garage', specialties: ['flat_tyre', 'battery'], callOutRateKes: 1800, location: { type: 'Point', coordinates: [36.833, -1.276] } },
+  { id: 'mech-06', name: 'Mombasa Auto Rescue', phone: '254700111006', whatsapp: '254700111006', county: 'Mombasa', town: 'Mombasa Island', type: 'partner_garage', specialties: ['overheating', 'strange_noise'], callOutRateKes: 4000, location: { type: 'Point', coordinates: [39.6682, -4.0435] } },
+]
+
+export const incidents: Incident[] = [
+  { id: 'inc-01', reference: 'SOS-101', status: 'open', category: 'flat_tyre', description: 'Vehicle breakdown reported', createdAt: '2026-11-14T06:20:00.000Z', location: { type: 'Point', coordinates: [36.8172, -1.2864] }, locationText: 'Nairobi CBD', vehicleId: 'car-03', immobilising: true, photos: [], source: 'driver' },
+  { id: 'inc-02', reference: 'SOS-102', status: 'dispatched', category: 'battery', description: 'Battery replacement dispatched', createdAt: '2026-11-14T07:15:00.000Z', location: { type: 'Point', coordinates: [36.787, -1.2928] }, locationText: 'Kilimani', vehicleId: 'car-04', immobilising: false, photos: [], source: 'desk', dispatch: { type: 'closest_partner', mechanicId: 'mech-02', createdAt: '2026-11-14T07:20:00.000Z' } },
+  { id: 'inc-03', reference: 'SOS-103', status: 'resolved', category: 'overheating', description: 'Cooling system checked', createdAt: '2026-11-13T10:00:00.000Z', location: { type: 'Point', coordinates: [36.804, -1.263] }, locationText: 'Westlands', vehicleId: 'car-11', immobilising: false, photos: [], source: 'customer' },
 ]
 
 export const auditEntries = [

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiClient } from './client'
 import { ApiError } from './client'
-import type { AvailableDriversResponse, Booking, BookingCreateRequest, DashboardData, Driver, DriverTripStatus, HealthStatus, MaintenanceWindow, NotificationCounts, QuoteRequest, QuoteResponse, SearchResult, Vehicle } from './types'
+import type { AvailableDriversResponse, Booking, BookingCreateRequest, DashboardData, Driver, DriverTripStatus, HealthStatus, Incident, IncidentCreateRequest, IncidentDispatchType, MaintenanceWindow, Mechanic, MechanicCreateRequest, NearbyMechanic, NotificationCounts, QuoteRequest, QuoteResponse, SearchResult, Vehicle } from './types'
 import { buildDashboardData } from '../features/dashboard/dashboardData'
 
 export function useHealth() {
@@ -94,7 +94,7 @@ export function useShellNotifications() {
   return useQuery({
     queryKey: ['shell-notifications'],
     queryFn: () => apiClient.get<NotificationCounts>('/notifications'),
-    refetchInterval: 45_000,
+    refetchInterval: 15_000,
   })
 }
 
@@ -149,5 +149,55 @@ export function useUpdateDriverTripStatus() {
         queryClient.invalidateQueries({ queryKey: ['booking', booking.id] }),
       ])
     },
+  })
+}
+
+export function useMechanics() {
+  return useQuery({ queryKey: ['mechanics'], queryFn: () => apiClient.get<Mechanic[]>('/mechanics') })
+}
+
+export function useNearestMechanics(latitude: number, longitude: number, category?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['mechanics', 'nearest', latitude, longitude, category],
+    queryFn: () => apiClient.get<NearbyMechanic[]>(`/mechanics/nearest?lat=${latitude}&lng=${longitude}&radiusKm=50&limit=5${category ? `&category=${encodeURIComponent(category)}` : ''}`),
+    enabled,
+  })
+}
+
+export function useIncidents() {
+  return useQuery({ queryKey: ['incidents'], queryFn: () => apiClient.get<Incident[]>('/incidents'), refetchInterval: 15_000 })
+}
+
+export function useCreateMechanic() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: MechanicCreateRequest) => apiClient.post<Mechanic>('/mechanics', request),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['mechanics'] }),
+  })
+}
+
+export function useCreateIncident() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: IncidentCreateRequest) => apiClient.post<Incident>('/incidents/breakdown', request),
+    onSuccess: async () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['incidents'] }),
+      queryClient.invalidateQueries({ queryKey: ['shell-notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+    ]),
+  })
+}
+
+export function useDispatchIncident() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ incidentId, type, mechanicId, vehicleId }: { incidentId: string; type: IncidentDispatchType; mechanicId?: string; vehicleId?: string }) =>
+      apiClient.patch<Incident>(`/incidents/${encodeURIComponent(incidentId)}/dispatch`, { type, mechanicId, vehicleId }),
+    onSuccess: async () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['incidents'] }),
+      queryClient.invalidateQueries({ queryKey: ['shell-notifications'] }),
+      queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+      queryClient.invalidateQueries({ queryKey: ['timeline-incidents'] }),
+    ]),
   })
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AtSign, Camera, CarFront, Mail, MapPin, Menu, Phone, Smartphone, X } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { t } from '../../i18n'
+import { APP_PROMO } from '../../features/home/homeConfig'
 
 const publicLinks = [
   { to: '/', label: 'nav.home', end: true },
@@ -40,7 +41,7 @@ export function PublicLayout() {
       <main className="public-main"><Outlet /></main>
 
       <footer className="public-footer">
-        <div className="public-footer__main">
+        <div className={APP_PROMO ? 'public-footer__main' : 'public-footer__main public-footer__main--no-app'}>
           <section className="footer-about">
             <Link aria-label={t('admin.brand')} className="brand brand--footer" to="/">
               <span className="brand__mark"><CarFront aria-hidden="true" size={24} /></span>
@@ -69,11 +70,11 @@ export function PublicLayout() {
             <Link to="/vehicles">{t('footer.sedans')}</Link>
             <Link to="/vehicles">{t('footer.vans')}</Link>
           </section>
-          <section className="footer-download">
+          {APP_PROMO && <section className="footer-download">
             <h2>{t('footer.download')}</h2>
             <a className="app-badge" href="#download"><Smartphone size={19} /><span><small>{t('footer.availableOn')}</small><b>{t('footer.appStore')}</b></span></a>
             <a className="app-badge" href="#download"><Smartphone size={19} /><span><small>{t('footer.getItOn')}</small><b>{t('footer.googlePlay')}</b></span></a>
-          </section>
+          </section>}
         </div>
         <div className="public-footer__bottom"><span>© {new Date().getFullYear()} {t('footer.copyright')}</span><span>{t('footer.tagline')}</span></div>
       </footer>

@@ -1,5 +1,5 @@
 import type { TimelineItemBase } from 'react-calendar-timeline'
-import type { Booking, BookingStatus, MaintenanceWindow } from '../../api/types'
+import type { Booking, BookingStatus, Incident, MaintenanceWindow } from '../../api/types'
 
 export const TURNAROUND_BUFFER_MS = 60 * 60 * 1000
 
@@ -36,15 +36,16 @@ const bufferColors: Record<BookingStatus, string> = {
 }
 
 export interface FleetTimelineItem extends TimelineItemBase<number> {
-  kind: 'booking' | 'buffer' | 'maintenance'
+  kind: 'booking' | 'buffer' | 'maintenance' | 'incident_warning'
   bookingId?: string
+  incidentId?: string
 }
 
 export function getTimelineStatusColor(status: BookingStatus): string {
   return statusColors[status]
 }
 
-export function buildTimelineItems(bookings: Booking[], windows: MaintenanceWindow[], bufferMs = TURNAROUND_BUFFER_MS): FleetTimelineItem[] {
+export function buildTimelineItems(bookings: Booking[], windows: MaintenanceWindow[], bufferMs = TURNAROUND_BUFFER_MS, incidents: Incident[] = []): FleetTimelineItem[] {
   const items: FleetTimelineItem[] = []
   for (const booking of bookings) {
     const start = Date.parse(booking.pickupAt)
@@ -92,6 +93,25 @@ export function buildTimelineItems(bookings: Booking[], windows: MaintenanceWind
       canResize: false,
       className: 'fleet-timeline__maintenance',
       kind: 'maintenance',
+    })
+  }
+  for (const incident of incidents) {
+    if (!incident.immobilising || !incident.vehicleId || ['resolved'].includes(incident.status)) continue
+    const createdAt = Date.parse(incident.createdAt)
+    if (!Number.isFinite(createdAt)) continue
+    const start = Math.min(createdAt, Date.now())
+    const end = Math.max(createdAt + 24 * 60 * 60 * 1000, Date.now() + 2 * 60 * 60 * 1000)
+    items.push({
+      id: `incident:${incident.id}`,
+      group: incident.vehicleId,
+      title: `IMMOBILISING · ${incident.reference}`,
+      start_time: start,
+      end_time: end,
+      canMove: false,
+      canResize: false,
+      className: 'fleet-timeline__incident-warning',
+      kind: 'incident_warning',
+      incidentId: incident.id,
     })
   }
   return items

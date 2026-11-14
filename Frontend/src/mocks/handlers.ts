@@ -1,11 +1,16 @@
 import { http, HttpResponse } from 'msw'
-import { bookings, DEMO_PASSWORD, drivers, maintenanceWindows, users, vehicles } from './fixtures'
-import { buildDashboardData, getOpenIncidents, getPendingApprovalCount, searchFixtures } from '../features/dashboard/dashboardData'
-import type { Booking, BookingCreateRequest, DriverTripStatus, HandoverRequest, HandoverSettlement, PaymentMethod, QuoteRequest, QuoteResponse, StkInitiation, StkStatus } from '../api/types'
+import { bookings, DEMO_PASSWORD, drivers, incidents, mechanics, maintenanceWindows, users, vehicles } from './fixtures'
+import { buildDashboardData, getPendingApprovalCount, searchFixtures } from '../features/dashboard/dashboardData'
+import type { Booking, BookingCreateRequest, DriverTripStatus, HandoverRequest, HandoverSettlement, PaymentMethod, QuoteRequest, QuoteResponse, StkInitiation, StkStatus, Vehicle } from '../api/types'
 import { getDriverEligibilityReason } from '../features/drivers/driverRules'
+import type { Incident, IncidentCreateRequest, IncidentDispatchType, Mechanic, MechanicCreateRequest } from '../api/types'
+import { getNearestMechanics } from '../features/incidents/incidentGeo'
+import { toGeoJson, toLeaflet } from '../lib/geo'
 
 let networkAttempts = 0
 const bookingStore: Booking[] = [...bookings]
+const incidentStore: Incident[] = [...incidents]
+const mechanicStore: Mechanic[] = [...mechanics]
 const stkAttempts = new Map<string, { bookingId: string; phone: string; amountKes: number; polls: number; createdAt: number }>()
 let driverRotationIndex = 0
 
@@ -18,6 +23,12 @@ function overlaps(booking: Booking, pickupAt: string, returnAt: string) {
 function isVehicleAvailable(vehicleId: string, pickupAt: string, returnAt: string) {
   const vehicle = vehicles.find((item) => item.id === vehicleId)
   return Boolean(vehicle && !['maintenance', 'inactive'].includes(vehicle.status) && !bookingStore.some((booking) => booking.vehicleId === vehicleId && overlaps(booking, pickupAt, returnAt)))
+}
+
+function categoryForVehicle(vehicle: Vehicle) {
+  if (vehicle.seats >= 8) return 'Van'
+  if (['Prado TX', 'X-Trail', 'RAV4', 'Forester', 'Land Cruiser V8', 'CX-5'].includes(vehicle.model)) return 'SUV'
+  return 'Sedan'
 }
 
 function calculateMockQuote(body: QuoteRequest, ratePerDay: number): QuoteResponse {
@@ -69,7 +80,7 @@ export const handlers = [
     const available = pickupAt && returnAt
       ? vehicles.filter((vehicle) => isVehicleAvailable(vehicle.id, pickupAt, returnAt))
       : vehicles
-    return HttpResponse.json({ success: true, data: available, error: null })
+    return HttpResponse.json({ success: true, data: available.map((vehicle) => ({ ...vehicle, category: categoryForVehicle(vehicle) })), error: null })
   }),
   http.get('/api/v1/maintenance-windows', ({ request }) => {
     const url = new URL(request.url)
@@ -77,6 +88,71 @@ export const handlers = [
     const to = Date.parse(url.searchParams.get('to') ?? '')
     const rows = maintenanceWindows.filter((window) => Date.parse(window.startAt) < to && Date.parse(window.endAt) > from)
     return HttpResponse.json({ success: true, data: rows, error: null })
+  }),
+  http.get('/api/v1/mechanics/nearest', ({ request }) => {
+    const url = new URL(request.url)
+    const latitude = Number(url.searchParams.get('lat'))
+    const longitude = Number(url.searchParams.get('lng'))
+    const radiusKm = Number(url.searchParams.get('radiusKm') ?? 50)
+    const limit = Number(url.searchParams.get('limit') ?? 5)
+    const category = url.searchParams.get('category') ?? undefined
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_LOCATION', message: 'A valid map location is required' } }, { status: 400 })
+    const location = toGeoJson([latitude, longitude])
+    const candidates = category ? mechanicStore.filter((mechanic) => mechanic.specialties.includes(category)) : mechanicStore
+    return HttpResponse.json({ success: true, data: getNearestMechanics(candidates, { location }, radiusKm, limit), error: null })
+  }),
+  http.get('/api/v1/mechanics', () => HttpResponse.json({ success: true, data: mechanicStore, error: null })),
+  http.post('/api/v1/mechanics', async ({ request }) => {
+    const body = await request.json() as MechanicCreateRequest
+    const coordinates = toLeaflet(body.location)
+    const mechanic: Mechanic = {
+      ...body,
+      id: `mech-${String(mechanicStore.length + 1).padStart(2, '0')}`,
+      location: toGeoJson(coordinates),
+    }
+    mechanicStore.push(mechanic)
+    return HttpResponse.json({ success: true, data: mechanic, error: null }, { status: 201 })
+  }),
+  http.get('/api/v1/incidents', () => HttpResponse.json({ success: true, data: [...incidentStore].sort((left, right) => right.createdAt.localeCompare(left.createdAt)), error: null })),
+  http.post('/api/v1/incidents/breakdown', async ({ request }) => {
+    const body = await request.json() as IncidentCreateRequest
+    const coordinates = toLeaflet(body.location)
+    const createdAt = new Date().toISOString()
+    const nextReference = `SOS-${String(100 + incidentStore.length + 1).padStart(3, '0')}`
+    const incident: Incident = {
+      ...body,
+      location: toGeoJson(coordinates),
+      id: `inc-${String(incidentStore.length + 1).padStart(2, '0')}`,
+      reference: nextReference,
+      status: 'open',
+      createdAt,
+    }
+    incidentStore.unshift(incident)
+    return HttpResponse.json({ success: true, data: incident, error: null }, { status: 201 })
+  }),
+  http.patch('/api/v1/incidents/:id/dispatch', async ({ params, request }) => {
+    const index = incidentStore.findIndex((incident) => incident.id === params.id)
+    if (index < 0) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Incident not found' } }, { status: 404 })
+    const body = await request.json() as { type: IncidentDispatchType; mechanicId?: string; vehicleId?: string }
+    const current = incidentStore[index]
+    let mechanicId = body.mechanicId
+    if (body.type === 'closest_partner') {
+      const partnerCandidates = mechanicStore.filter((mechanic) => mechanic.type === 'partner_garage')
+      const nearest = getNearestMechanics(partnerCandidates, current, 50, 1)[0]
+      if (!nearest) return HttpResponse.json({ success: false, data: null, error: { code: 'NO_PARTNER_WITHIN_RANGE', message: 'No partner mechanic is available within 50 km' } }, { status: 409 })
+      mechanicId = nearest.id
+    }
+    if (body.type === 'in_house_rescue' && !mechanicId) {
+      mechanicId = getNearestMechanics(mechanicStore.filter((mechanic) => mechanic.type === 'in_house'), current, 50, 1)[0]?.id
+    }
+    if (body.type === 'replacement_vehicle' && !body.vehicleId) return HttpResponse.json({ success: false, data: null, error: { code: 'VEHICLE_REQUIRED', message: 'Select a replacement vehicle' } }, { status: 400 })
+    const updated: Incident = {
+      ...current,
+      status: body.type === 'replacement_vehicle' ? 'awaiting_replacement' : 'dispatched',
+      dispatch: { type: body.type, mechanicId, vehicleId: body.vehicleId, createdAt: new Date().toISOString() },
+    }
+    incidentStore[index] = updated
+    return HttpResponse.json({ success: true, data: updated, error: null })
   }),
   http.get('/api/v1/drivers', () => HttpResponse.json({ success: true, data: drivers, error: null })),
   http.get('/api/v1/drivers/available', ({ request }) => {
@@ -336,7 +412,7 @@ export const handlers = [
   }),
   http.get('/api/v1/notifications', () => HttpResponse.json({
     success: true,
-    data: { pendingApprovals: getPendingApprovalCount(), openIncidents: getOpenIncidents().length },
+    data: { pendingApprovals: getPendingApprovalCount(), openIncidents: incidentStore.filter((incident) => incident.status === 'open').length },
     error: null,
   })),
   http.get('/api/v1/search', ({ request }) => {
