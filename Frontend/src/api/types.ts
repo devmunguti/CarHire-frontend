@@ -4,17 +4,10 @@ export type BookingStatus =
   | 'reserved'
   | 'confirmed'
   | 'checked_out'
-  | 'expired'
-  | 'pending'
-  | 'awaiting_approval'
-  | 'approved'
-  | 'confirmed'
-  | 'active'
+  | 'overdue'
   | 'completed'
   | 'cancelled'
-  | 'rejected'
-  | 'overdue'
-  | 'draft'
+  | 'expired'
 
 export type DriveMode = 'self_drive' | 'chauffeur'
 export type PaymentMethod = 'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'
@@ -23,7 +16,7 @@ export type DriverTripStatus = 'en_route_to_pickup' | 'customer_onboard' | 'trip
 export type DriverLocation = 'in_town' | 'upcountry'
 export type MechanicType = 'in_house' | 'partner_garage' | 'towing'
 export type IncidentCategory = 'flat_tyre' | 'battery' | 'overheating' | 'accident' | 'strange_noise'
-export type IncidentStatus = 'open' | 'dispatching' | 'awaiting_replacement' | 'dispatched' | 'resolved'
+export type IncidentStatus = 'open' | 'awaiting_replacement' | 'dispatched' | 'resolved'
 export type IncidentDispatchType = 'closest_partner' | 'in_house_rescue' | 'replacement_vehicle'
 
 export interface QuoteLineItem {
@@ -64,7 +57,7 @@ export interface BookingPayment {
   id: string
   method: PaymentMethod
   amountKes: number
-  status: 'pending' | 'paid' | 'failed'
+  status: 'pending' | 'paid' | 'failed' | 'refund_pending' | 'refunded'
   reference: string
   createdAt: string
 }
@@ -96,7 +89,6 @@ export interface HandoverRequest {
   photos: string[]
   signatureConfirmed: boolean
   criticalDefect: boolean
-  completedAt: string
 }
 
 export interface HandoverSettlement {
@@ -114,13 +106,24 @@ export interface HandoverSettlement {
 export interface StkInitiation {
   paymentId: string
   maskedPhone: string
+  amountKes: number
 }
 
 export interface StkStatus {
-  outcome: 'pending' | 'confirmed' | 'failed' | 'manual_refund'
+  outcome: 'pending' | 'partial' | 'confirmed' | 'failed' | 'manual_refund'
   amountDueKes: number
   paidAmountKes?: number
+  balanceDueKes?: number
   message?: string
+}
+
+export interface BookingRefund {
+  id: string
+  paymentId: string
+  amountKes: number
+  status: 'pending' | 'refunded' | 'failed'
+  reason?: string
+  createdAt: string
 }
 
 export interface User {
@@ -153,17 +156,58 @@ export interface AvailableDriversResponse {
 export interface StaffMember extends User {
   branch: string
   active: boolean
-  lastLogin: string
+  lastLogin?: string
 }
 
 export interface AuditEntry {
   id: string
+  actorId?: string
   actor: string
   action: string
   entity: string
   createdAt: string
   before?: Record<string, unknown>
   after?: Record<string, unknown>
+}
+
+export interface StaffInvitationRequest {
+  name: string
+  email: string
+  phone: string
+  role: UserRole
+  branch: string
+  driverProfile?: {
+    languages: string[]
+    licenceClass: string
+    licenceExpiresAt: string
+    psvExpiresAt: string
+  }
+}
+
+export interface StaffInvitation {
+  id: string
+  email: string
+  role: UserRole
+  expiresAt: string
+}
+
+export interface StaffUpdateRequest {
+  role?: UserRole
+  branch?: string
+  active?: boolean
+}
+
+export interface ProfileUpdateRequest {
+  name?: string
+  phone?: string
+}
+
+export interface AuditQuery {
+  actorId?: string
+  action?: string
+  entity?: string
+  from?: string
+  to?: string
 }
 
 export interface Vehicle {
@@ -179,6 +223,14 @@ export interface Vehicle {
   status: VehicleStatus
 }
 
+export type VehicleManagementStatus = Exclude<VehicleStatus, 'booked'>
+
+export type VehicleCreateRequest = Omit<Vehicle, 'id' | 'status'> & {
+  status?: VehicleManagementStatus
+}
+
+export type VehicleUpdateRequest = Partial<VehicleCreateRequest>
+
 export interface MaintenanceWindow {
   id: string
   vehicleId: string
@@ -186,6 +238,9 @@ export interface MaintenanceWindow {
   endAt: string
   reason: string
 }
+
+export type MaintenanceWindowCreateRequest = Omit<MaintenanceWindow, 'id'>
+export type MaintenanceWindowUpdateRequest = Partial<Pick<MaintenanceWindow, 'startAt' | 'endAt' | 'reason'>>
 
 export interface Mechanic {
   id: string
@@ -211,18 +266,22 @@ export interface Booking {
   customerIdNumber?: string
   status: BookingStatus
   pendingApproval?: boolean
+  createdAt?: string
   pickupAt: string
   returnAt: string
+  pickupLocation?: string
   totalKes: number
   mode?: DriveMode
   paymentMethod?: PaymentMethod
   holdExpiresAt?: string
   createdById?: string
+  driverId?: string
   pricingSnapshot?: PricingSnapshot
   payments?: BookingPayment[]
   events?: BookingEvent[]
   driver?: User
   vehicleRegistration?: string
+  vehicleName?: string
   driverTripStatus?: DriverTripStatus
   inspections?: BookingInspection[]
   auditEntries?: BookingEvent[]
@@ -245,9 +304,20 @@ export interface GuestBookingAccess extends GuestBookingSummary {
 }
 
 export interface ApiEnvelope<T> {
-  success: boolean
-  data?: T
-  error?: { code?: string; message: string }
+  success: true
+  data: T
+  error: null
+}
+
+export interface ApiErrorEnvelope {
+  success: false
+  data: null
+  error: { code: string; message: string; details?: { field: string; message: string }[] }
+}
+
+export interface CursorPage<T> {
+  items: T[]
+  nextCursor: string | null
 }
 
 export interface AuthSession {
@@ -307,9 +377,10 @@ export interface IncidentCreateRequest {
   locationText: string
   vehicleId?: string
   immobilising: boolean
-  photos: string[]
-  source: Incident['source']
+  photos: File[]
 }
+
+export type IncidentSource = Incident['source']
 
 export type MechanicCreateRequest = Omit<Mechanic, 'id'>
 
@@ -336,5 +407,14 @@ export interface BookingCreateRequest extends QuoteRequest {
   customerEmail: string
   customerIdNumber: string
   paymentMethod: PaymentMethod
-  createdById: string
+}
+
+export interface OfflineApprovalRequest {
+  paymentMethod: Exclude<PaymentMethod, 'mpesa_online'>
+  reference: string
+  reason?: string
+}
+
+export interface BookingCancellationRequest {
+  reason?: string
 }

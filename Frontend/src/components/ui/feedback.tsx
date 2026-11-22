@@ -25,5 +25,5 @@ export function ErrorState({ title, retryLabel, onRetry }: { title: string; retr
 
 export function Toast({ message, tone = 'success', onClose }: { message: string; tone?: 'success' | 'info' | 'danger'; onClose: () => void }) {
   const Icon = tone === 'success' ? CheckCircle2 : tone === 'danger' ? XCircle : Info
-  return <div aria-live="polite" className={`toast toast--${tone}`} role="status"><Icon aria-hidden="true" /><span>{message}</span><button aria-label={t('styleguide.cancel')} onClick={onClose} type="button"><X size={16} /></button></div>
+  return <div aria-live={tone === 'danger' ? 'assertive' : 'polite'} className={`toast toast--${tone}`} role={tone === 'danger' ? 'alert' : 'status'}><Icon aria-hidden="true" /><span>{message}</span><button aria-label={t('styleguide.cancel')} onClick={onClose} type="button"><X size={16} /></button></div>
 }

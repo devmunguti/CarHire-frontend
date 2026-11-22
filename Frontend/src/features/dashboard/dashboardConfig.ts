@@ -1,7 +1,7 @@
 import type { DashboardCardKey } from '../../api/types'
 
 export const DASHBOARD_KPI_ROUTES: Record<DashboardCardKey, string> = {
-  vehiclesOutToday: '/admin/bookings?status=active',
+  vehiclesOutToday: '/admin/bookings?status=checked_out',
   pickupsDueToday: '/admin/bookings?pickup=due-today',
   returnsDueToday: '/admin/bookings?return=due-today',
   overdueVehicles: '/admin/bookings?status=overdue',

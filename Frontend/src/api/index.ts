@@ -1,10 +1,12 @@
 export { ApiError, apiClient, getAccessToken, setAccessToken } from './client'
 export { getCurrentUser, login, logout } from './auth'
-export { useAssignDriver, useAvailableDrivers, useAvailableVehicles, useBookingDetail, useBookingList, useBookings, useCalculateQuote, useCreateBooking, useCreateIncident, useCreateMechanic, useDashboard, useDispatchIncident, useDrivers, useGlobalSearch, useHealth, useIncidents, useMaintenanceWindows, useMechanics, useMyDriverTrips, useNearestMechanics, useShellNotifications, useUpdateBooking, useUpdateDriverTripStatus, useVehicles } from './queries'
+export { useApproveOfflinePayment, useAssignDriver, useAvailableDrivers, useAvailableVehicles, useBookingDetail, useBookingList, useBookings, useCalculateQuote, useCancelBooking, useCreateBooking, useCreateIncident, useCreateMaintenanceWindow, useCreateMechanic, useCreateVehicle, useDashboard, useDeleteMaintenanceWindow, useDispatchIncident, useDrivers, useGlobalSearch, useHealth, useIncidents, useMaintenanceWindows, useMechanics, useMyDriverTrips, useNearestMechanics, useShellNotifications, useUpdateDriverTripStatus, useUpdateMaintenanceWindow, useUpdateVehicle, useVehicles } from './queries'
 export type {
+  ApiErrorEnvelope,
   ApiEnvelope,
   AuthSession,
   Booking,
+  BookingCancellationRequest,
   BookingStatus,
   HealthStatus,
   DashboardData,
@@ -14,13 +16,17 @@ export type {
   IncidentCategory,
   IncidentCreateRequest,
   IncidentDispatchType,
+  IncidentSource,
   IncidentStatus,
   Mechanic,
   MechanicCreateRequest,
   MechanicType,
   NearbyMechanic,
   MaintenanceWindow,
+  MaintenanceWindowCreateRequest,
+  MaintenanceWindowUpdateRequest,
   NotificationCounts,
+  OfflineApprovalRequest,
   SearchResult,
   BookingCreateRequest,
   DriveMode,
@@ -31,6 +37,7 @@ export type {
   BookingEvent,
   BookingInspection,
   BookingPayment,
+  CursorPage,
   AvailableDriversResponse,
   Driver,
   DriverLocation,
@@ -39,5 +46,8 @@ export type {
   User,
   UserRole,
   Vehicle,
+  VehicleCreateRequest,
+  VehicleManagementStatus,
   VehicleStatus,
+  VehicleUpdateRequest,
 } from './types'

@@ -5,10 +5,10 @@ import { Controller, useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { ApiError, apiClient } from '../../api/client'
+import { isMockApiEnabled } from '../../api/config'
 import { useAvailableVehicles, useCreateBooking } from '../../api/queries'
 import type { Booking, DriveMode, QuoteRequest, QuoteResponse, Vehicle } from '../../api/types'
 import { Button, DateTimeRangePicker, Input, PhoneInput, Select, Stepper } from '../../components/ui'
-import { useAuth } from '../../hooks/AuthContext'
 import { t } from '../../i18n'
 import { formatEat, formatKes, isKenyanPhone, normalisePhone } from '../../lib'
 import { QuoteBuilder, QuoteBreakdown } from './QuoteBuilder'
@@ -22,6 +22,14 @@ const customerSchema = z.object({
 })
 
 type CustomerValues = z.infer<typeof customerSchema>
+
+const paymentMethodOptions = [
+  { value: 'mpesa_online', labelKey: 'booking.mpesaOnline' },
+  { value: 'mpesa_manual', labelKey: 'booking.mpesaManual' },
+  { value: 'cash', labelKey: 'booking.cash' },
+  { value: 'bank', labelKey: 'booking.bank' },
+  { value: 'corporate', labelKey: 'booking.corporate' },
+] as const
 
 function VehiclePrice({ vehicle, request, onSelect, selected }: { vehicle: Vehicle; request: QuoteRequest; onSelect: () => void; selected: boolean }) {
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
@@ -50,10 +58,9 @@ function VehiclePrice({ vehicle, request, onSelect, selected }: { vehicle: Vehic
 export function BookingWizard() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { user } = useAuth()
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<DriveMode>('self_drive')
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'>('mpesa_online')
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'>(() => isMockApiEnabled ? 'mpesa_online' : 'cash')
   const [request, setRequest] = useState<QuoteRequest>(() => ({
     vehicleId: searchParams.get('vehicleId') ?? '',
     pickupAt: searchParams.get('pickupAt') ?? '',
@@ -64,6 +71,7 @@ export function BookingWizard() {
   }))
   const [quote, setQuote] = useState<QuoteResponse | null>(null)
   const [conflict, setConflict] = useState(false)
+  const [createError, setCreateError] = useState(false)
   const [paymentBooking, setPaymentBooking] = useState<Booking | null>(null)
   const [dateError, setDateError] = useState<string | null>(null)
   const form = useForm<CustomerValues>({ resolver: zodResolver(customerSchema), mode: 'onTouched', defaultValues: { customerName: '', customerPhone: '', customerEmail: '', customerIdNumber: '' } })
@@ -75,6 +83,7 @@ export function BookingWizard() {
     setRequest(value)
     setMode(value.mode)
     setConflict(false)
+    setCreateError(false)
   }, [])
 
   async function validateStep() {
@@ -101,13 +110,13 @@ export function BookingWizard() {
     if (step === 4) {
       await form.handleSubmit(async (customer) => {
         if (!quote || !request.vehicleId) return
+        setCreateError(false)
         try {
           const booking = await createBooking.mutateAsync({
             ...request,
             ...customer,
             customerPhone: normalisePhone(customer.customerPhone),
             paymentMethod,
-            createdById: user?.id ?? '',
           })
           if (paymentMethod === 'mpesa_online') setPaymentBooking(booking)
           else navigate(`/admin/bookings/${booking.id}`)
@@ -115,6 +124,8 @@ export function BookingWizard() {
           if (error instanceof ApiError && error.status === 409) {
             setConflict(true)
             await availableVehicles.refetch()
+          } else {
+            setCreateError(true)
           }
         }
       })()
@@ -144,6 +155,7 @@ export function BookingWizard() {
           <PaymentStatus
             amountDueKes={paymentBooking.totalKes}
             bookingId={paymentBooking.id}
+            bookingReference={paymentBooking.reference}
             initialPhone={normalisePhone(form.getValues('customerPhone'))}
             onConfirmed={() => navigate(`/admin/bookings/${paymentBooking.id}`)}
           />
@@ -188,11 +200,9 @@ export function BookingWizard() {
             <div><dt>{t('booking.return')}</dt><dd>{request.returnAt ? formatEat(request.returnAt) : '—'}</dd></div>
           </dl></section>
           {quote && <QuoteBreakdown quote={quote} />}
-          <Select label={t('booking.paymentMethod')} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)} options={[
-            { value: 'mpesa_online', label: t('booking.mpesaOnline') }, { value: 'mpesa_manual', label: t('booking.mpesaManual') },
-            { value: 'cash', label: t('booking.cash') }, { value: 'bank', label: t('booking.bank') }, { value: 'corporate', label: t('booking.corporate') },
-          ]} value={paymentMethod} />
+          <Select label={t('booking.paymentMethod')} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)} options={paymentMethodOptions.filter((option) => isMockApiEnabled || option.value !== 'mpesa_online').map(({ value, labelKey }) => ({ value, label: t(labelKey) }))} value={paymentMethod} />
           {conflict && <p className="quote-conflict" role="alert">{t('booking.reserveConflict')}</p>}
+          {createError && <p className="field__error" role="alert">{t('booking.actionError')}</p>}
         </div>}
         </>}
       </div>

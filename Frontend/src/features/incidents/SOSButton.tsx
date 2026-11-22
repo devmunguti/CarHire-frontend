@@ -1,9 +1,10 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { AlertTriangle, Camera, MapPin, Phone } from 'lucide-react'
 import { useCreateIncident } from '../../api/queries'
-import type { IncidentCategory, IncidentCreateRequest } from '../../api/types'
+import type { IncidentCategory, IncidentSource } from '../../api/types'
 import { Button, Input, Modal, Select } from '../../components/ui'
 import { toGeoJson, type GeoJsonPoint } from '../../lib/geo'
+import { isAllowedOperationPhoto, MAX_OPERATION_PHOTOS } from '../../lib/image'
 import { LazyGeoMap } from './LazyGeoMap'
 
 const nairobiFallback = toGeoJson([-1.2864, 36.8172])
@@ -15,16 +16,7 @@ const incidentCategories: { value: IncidentCategory; label: string }[] = [
   { value: 'strange_noise', label: 'Strange Noise' },
 ]
 
-function readPhoto(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.addEventListener('load', () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Photo could not be read')))
-    reader.addEventListener('error', () => reject(new Error('Photo could not be read')))
-    reader.readAsDataURL(file)
-  })
-}
-
-export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: IncidentCreateRequest['source']; vehicleId?: string; label?: string }) {
+export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: IncidentSource; vehicleId?: string; label?: string }) {
   const createIncident = useCreateIncident()
   const [open, setOpen] = useState(false)
   const [location, setLocation] = useState<GeoJsonPoint | null>(null)
@@ -63,8 +55,19 @@ export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: Incide
   }
 
   function onPhotos(event: ChangeEvent<HTMLInputElement>) {
-    setPhotos((current) => [...current, ...Array.from(event.currentTarget.files ?? [])])
+    const additions = Array.from(event.currentTarget.files ?? [])
     event.currentTarget.value = ''
+    if (photos.length + additions.length > MAX_OPERATION_PHOTOS) {
+      setError(`Add no more than ${MAX_OPERATION_PHOTOS} photos.`)
+      return
+    }
+    const invalid = additions.find((file) => !isAllowedOperationPhoto(file))
+    if (invalid) {
+      setError('Photos must be JPG, PNG, or WebP files no larger than 5 MiB each.')
+      return
+    }
+    setError(null)
+    setPhotos((current) => [...current, ...additions])
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -73,7 +76,6 @@ export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: Incide
     if (!submittedLocation) { setError('Set a GPS location, place a pin, or enter a road, landmark or town.'); return }
     setError(null)
     try {
-      const photoData = await Promise.all(photos.map(readPhoto))
       await createIncident.mutateAsync({
         category,
         description: description.trim(),
@@ -81,8 +83,7 @@ export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: Incide
         locationText: locationText.trim() || (gpsState === 'ready' ? 'GPS location' : 'Manually placed pin'),
         vehicleId,
         immobilising,
-        photos: photoData,
-        source,
+        photos,
       })
       setOpen(false)
       setPhotos([])
@@ -106,7 +107,7 @@ export function SOSButton({ source, vehicleId, label = 'SOS' }: { source: Incide
         </div>
         <LazyGeoMap center={location ?? nairobiFallback} marker={location ? { point: location, label: locationText || 'Incident location', tone: 'danger' } : undefined} onPlace={(point) => { setLocation(point); setGpsState('denied') }} placementEnabled={manualPinMode || gpsState === 'denied'} zoom={13} />
         {(gpsState === 'denied' || manualPinMode) && <Input label="Location or landmark" onChange={(event) => setLocationText(event.target.value)} placeholder="Street, landmark or town" value={locationText} />}
-        <div className="field"><span className="field__label">Photos</span><label className="sos-photo-picker"><Camera aria-hidden="true" size={17} /> Add photos<input accept="image/*" capture="environment" multiple onChange={onPhotos} type="file" /></label>{photos.map((photo) => <small key={`${photo.name}-${photo.lastModified}`}>{photo.name}</small>)}</div>
+        <div className="field"><span className="field__label">Photos</span><label className="sos-photo-picker"><Camera aria-hidden="true" size={17} /> Add photos<input accept="image/jpeg,image/png,image/webp" capture="environment" multiple onChange={onPhotos} type="file" /></label>{photos.map((photo) => <small key={`${photo.name}-${photo.lastModified}`}>{photo.name}</small>)}</div>
         {vehicleId && <label className="choice"><input checked={immobilising} onChange={(event) => setImmobilising(event.target.checked)} type="checkbox" /><span>Vehicle cannot be driven</span></label>}
         {error && <p className="field__error" role="alert">{error}</p>}
         <div className="confirm-dialog__actions"><Button onClick={() => setOpen(false)} variant="secondary">Cancel</Button><Button disabled={createIncident.isPending || gpsState === 'loading'} type="submit" variant="danger">{createIncident.isPending ? 'Sending…' : 'Send SOS'}</Button></div>

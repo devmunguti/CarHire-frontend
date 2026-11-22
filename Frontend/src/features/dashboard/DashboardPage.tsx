@@ -8,7 +8,6 @@ import { DataTable, EmptyState } from '../../components/ui'
 import { t } from '../../i18n'
 import { useAuth } from '../../hooks/AuthContext'
 import { formatEat, formatKes } from '../../lib'
-import { vehicles } from '../../mocks/fixtures'
 import { DashboardKpiCard } from './DashboardKpiCard'
 
 const metricLabels: Record<DashboardCardKey, string> = {
@@ -28,17 +27,12 @@ const fleetColors = {
   maintenance: '#b91c1c',
 }
 
-const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]))
-
 function BookingTable({ rows, type }: { rows: Booking[]; type: 'pickup' | 'return' }) {
   const isPickup = type === 'pickup'
   const columns = [
     { key: 'time', header: t('dashboard.time'), render: (booking: Booking) => formatEat(isPickup ? booking.pickupAt : booking.returnAt).split(', ')[1] },
     { key: 'customer', header: t('dashboard.customer'), render: (booking: Booking) => booking.customerName ?? '—' },
-    { key: 'vehicle', header: t('dashboard.vehicle'), render: (booking: Booking) => {
-      const vehicle = vehicleById.get(booking.vehicleId)
-      return vehicle ? `${vehicle.make} ${vehicle.model}` : '—'
-    } },
+    { key: 'vehicle', header: t('dashboard.vehicle'), render: (booking: Booking) => booking.vehicleName ?? booking.vehicleRegistration ?? booking.vehicleId },
     { key: 'action', header: '', render: (booking: Booking) => (
       <Link className="button button--secondary button--sm" to={`/admin/bookings/${booking.id}/${isPickup ? 'check-out' : 'check-in'}`}>
         {t(isPickup ? 'dashboard.checkOut' : 'dashboard.checkIn')}

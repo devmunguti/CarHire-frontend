@@ -1,5 +1,5 @@
 import { apiClient, setAccessToken } from './client'
-import type { AuthSession, User } from './types'
+import type { AuthSession, ProfileUpdateRequest, User } from './types'
 
 export async function login(email: string, password: string): Promise<User> {
   const session = await apiClient.post<AuthSession>('/auth/login', { email, password })
@@ -17,4 +17,8 @@ export async function logout(): Promise<void> {
 
 export function getCurrentUser() {
   return apiClient.get<User>('/auth/me')
+}
+
+export function updateCurrentUser(request: ProfileUpdateRequest) {
+  return apiClient.patch<User>('/auth/me', request)
 }

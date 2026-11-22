@@ -5,7 +5,7 @@ import { DASHBOARD_KPI_ROUTES } from './dashboardConfig'
 
 describe('dashboard fallback and search fixtures', () => {
   it('builds all seven dashboard metrics from seeded data', () => {
-    const data = buildDashboardData(vehicles, bookings, incidents, new Date('2026-11-14T09:00:00.000Z'))
+    const data = buildDashboardData(vehicles, bookings, incidents, new Date('2026-11-09T09:00:00.000Z'))
     expect(Object.keys(data.metrics)).toHaveLength(7)
     expect(data.metrics.pendingApprovals).toBeGreaterThan(0)
     expect(data.metrics.activeBreakdowns).toBe(2)
@@ -24,7 +24,7 @@ describe('dashboard fallback and search fixtures', () => {
 
 describe('dashboard KPI deep links', () => {
   it.each([
-    ['vehiclesOutToday', '/admin/bookings?status=active'],
+    ['vehiclesOutToday', '/admin/bookings?status=checked_out'],
     ['pickupsDueToday', '/admin/bookings?pickup=due-today'],
     ['returnsDueToday', '/admin/bookings?return=due-today'],
     ['overdueVehicles', '/admin/bookings?status=overdue'],

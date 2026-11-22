@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react'
-import { getCurrentUser, login as loginRequest, logout as logoutRequest } from '../api/auth'
-import type { User, UserRole } from '../api/types'
+import { getCurrentUser, login as loginRequest, logout as logoutRequest, updateCurrentUser } from '../api/auth'
+import type { ProfileUpdateRequest, User, UserRole } from '../api/types'
 
 type AuthContextValue = {
   user: User | null
@@ -8,6 +8,7 @@ type AuthContextValue = {
   isLoading: boolean
   login: (email: string, password: string) => Promise<User>
   logout: () => Promise<void>
+  updateProfile: (request: ProfileUpdateRequest) => Promise<User>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -63,8 +64,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }
 
+  async function updateProfile(request: ProfileUpdateRequest) {
+    const updatedUser = await updateCurrentUser(request)
+    setUser(updatedUser)
+    return updatedUser
+  }
+
   return (
-    <AuthContext.Provider value={{ user, role: user?.role ?? null, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, role: user?.role ?? null, isLoading, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

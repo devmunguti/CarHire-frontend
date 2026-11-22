@@ -20,7 +20,7 @@ const ownTrip: Booking = {
   customerId: 'customer-1',
   customerName: 'Own Customer',
   customerPhone: '254712345678',
-  status: 'active',
+  status: 'checked_out',
   pickupAt: '2026-11-14T06:00:00.000Z',
   returnAt: '2026-11-14T15:00:00.000Z',
   totalKes: 10000,

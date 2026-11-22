@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useAssignDriver, useAvailableDrivers, useBookingDetail, useUpdateBooking } from '../../api/queries'
+import { useApproveOfflinePayment, useAssignDriver, useAvailableDrivers, useBookingDetail, useCancelBooking, useVehicles } from '../../api/queries'
 import { ApiError } from '../../api/client'
+import { isMockApiEnabled } from '../../api/config'
 import type { BookingStatus } from '../../api/types'
-import { Button, Checkbox, DataTable, EmptyState, ErrorState, Modal, Select, Skeleton, StatusChip } from '../../components/ui'
+import { Button, Checkbox, DataTable, EmptyState, ErrorState, Input, Modal, Select, Skeleton, StatusChip } from '../../components/ui'
 import { useCan } from '../../hooks/useCan'
+import { useAuth } from '../../hooks/AuthContext'
 import { t } from '../../i18n'
 import { formatEat, formatKenyanPhone, formatKes } from '../../lib'
-import { vehicles } from '../../mocks/fixtures'
 import { HoldCountdown } from './HoldCountdown'
 import { QuoteBreakdown } from './QuoteBuilder'
 import { PaymentStatus } from './PaymentStatus'
@@ -17,20 +18,26 @@ export function BookingDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const bookingQuery = useBookingDetail(id)
-  const updateBooking = useUpdateBooking(id)
+  const vehiclesQuery = useVehicles()
+  const approveOfflinePayment = useApproveOfflinePayment(id)
+  const cancelBooking = useCancelBooking(id)
   const assignDriver = useAssignDriver(id)
   const canApprove = useCan('approvals:offline')
   const canHandover = useCan('handover:manage')
   const canAssignDriver = useCan('drivers:assign')
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [approvalOpen, setApprovalOpen] = useState(false)
+  const [paymentReference, setPaymentReference] = useState('')
+  const [approvalReason, setApprovalReason] = useState('')
   const [assignDriverOpen, setAssignDriverOpen] = useState(false)
   const [selectedDriverId, setSelectedDriverId] = useState('')
   const [autoAssign, setAutoAssign] = useState(false)
   const [assignDriverError, setAssignDriverError] = useState<string | null>(null)
   const [expired, setExpired] = useState(false)
   const [actionError, setActionError] = useState(false)
+  const { user } = useAuth()
   const booking = bookingQuery.data
-  const vehicle = booking ? vehicles.find((item) => item.id === booking.vehicleId) : undefined
+  const vehicle = booking ? vehiclesQuery.data?.find((item) => item.id === booking.vehicleId) : undefined
   const availableDriversQuery = useAvailableDrivers(booking?.pickupAt ?? '', booking?.returnAt ?? '', booking?.vehicleId ?? '', assignDriverOpen)
   const assignableDrivers = (availableDriversQuery.data?.drivers ?? []).filter((driver) => booking
     && !getDriverEligibilityReason(driver, booking.returnAt)
@@ -39,13 +46,19 @@ export function BookingDetailPage() {
     ? availableDriversQuery.data?.autoAssignDriverId ?? null
     : null
 
-  async function updateStatus(status: BookingStatus) {
+  async function approvePayment() {
+    if (!booking || !paymentReference.trim()) return
     setActionError(false)
     try {
-      await updateBooking.mutateAsync({ status, pendingApproval: status === 'confirmed' ? false : booking?.pendingApproval })
+      const paymentMethod = booking.paymentMethod === 'mpesa_online' || !booking.paymentMethod ? 'cash' : booking.paymentMethod
+      await approveOfflinePayment.mutateAsync({
+        paymentMethod,
+        reference: paymentReference.trim(),
+        ...(approvalReason.trim() ? { reason: approvalReason.trim() } : {}),
+      })
+      setApprovalOpen(false)
     } catch {
       setActionError(true)
-      return
     }
   }
 
@@ -62,14 +75,14 @@ export function BookingDetailPage() {
       </header>
 
       <section className="booking-detail-actions">
-        {booking.status === 'reserved' && canApprove && booking.pendingApproval && <Button disabled={updateBooking.isPending} onClick={() => void updateStatus('confirmed')} variant="primary">{t('booking.approveOffline')}</Button>}
+        {booking.status === 'reserved' && canApprove && booking.pendingApproval && user?.id !== booking.createdById && !(user?.role === 'agent' && booking.paymentMethod === 'corporate') && <Button disabled={approveOfflinePayment.isPending} onClick={() => { setPaymentReference(''); setApprovalReason(''); setApprovalOpen(true) }} variant="primary">{t('booking.approveOffline')}</Button>}
         {booking.status === 'confirmed' && canHandover && <Link className="button button--primary" to={`/admin/bookings/${booking.id}/check-out`}>{t('booking.checkOut')}</Link>}
         {booking.status === 'confirmed' && canAssignDriver && booking.mode === 'chauffeur' && <>
           <Button onClick={() => { setAssignDriverOpen(true); setAssignDriverError(null); setSelectedDriverId(''); setAutoAssign(false) }} variant="secondary">{t('booking.assignDriver')}</Button>
         </>}
         {booking.status === 'checked_out' && canHandover && <Link className="button button--primary" to={`/admin/bookings/${booking.id}/check-in`}>{t('booking.checkIn')}</Link>}
         {booking.status === 'overdue' && canHandover && <Link className="button button--danger" to={`/admin/bookings/${booking.id}/check-in`}>{t('booking.checkIn')}</Link>}
-        {['reserved', 'confirmed'].includes(booking.status) && <Button onClick={() => setCancelOpen(true)} variant="danger">{t('booking.cancel')}</Button>}
+        {booking.status === 'reserved' && <Button onClick={() => setCancelOpen(true)} variant="danger">{t('booking.cancel')}</Button>}
         {booking.status === 'overdue' && <span className="booking-late-fee">{t('booking.accruedLateFee')}: {formatKes(booking.accruedLateFeeKes ?? 0)}</span>}
       </section>
 
@@ -107,7 +120,9 @@ export function BookingDetailPage() {
       </Modal>}
 
       {booking.status === 'reserved' && booking.paymentMethod === 'mpesa_online' && <section className="booking-detail-payment">
-        <PaymentStatus amountDueKes={booking.totalKes} bookingId={booking.id} initialPhone={booking.customerPhone} onConfirmed={() => void bookingQuery.refetch()} />
+        {isMockApiEnabled
+          ? <PaymentStatus amountDueKes={booking.totalKes} bookingId={booking.id} bookingReference={booking.reference} initialPhone={booking.customerPhone} onConfirmed={() => void bookingQuery.refetch()} />
+          : <p role="status">Online payment processing is not enabled yet. This hold will expire automatically; create a new booking using an offline payment method.</p>}
       </section>}
 
       <div className="booking-detail-grid">
@@ -149,7 +164,18 @@ export function BookingDetailPage() {
         </section>
       </div>
       {actionError && <p className="quote-conflict" role="alert">{t('booking.actionError')}</p>}
-      {cancelOpen && <div className="booking-cancel-confirm" role="group"><span>{t('booking.cancelConfirm')}</span><Button onClick={() => void updateStatus('cancelled').then(() => { setCancelOpen(false); navigate('/admin/bookings') })} variant="danger">{t('booking.confirmAction')}</Button><Button onClick={() => setCancelOpen(false)} variant="secondary">{t('booking.back')}</Button></div>}
+      {approvalOpen && <Modal open title={t('booking.approveOffline')} onClose={() => setApprovalOpen(false)}>
+        <div className="modal-body stack stack--md">
+          <Input autoComplete="off" label="Payment reference / receipt code" onChange={(event) => setPaymentReference(event.target.value)} value={paymentReference} />
+          {booking.paymentMethod === 'corporate' && <Input label="Reason" onChange={(event) => setApprovalReason(event.target.value)} value={approvalReason} />}
+          {actionError && <p className="field__error" role="alert">{t('booking.actionError')}</p>}
+          <div className="confirm-dialog__actions">
+            <Button onClick={() => setApprovalOpen(false)} variant="secondary">{t('booking.back')}</Button>
+            <Button disabled={!paymentReference.trim() || (booking.paymentMethod === 'corporate' && !approvalReason.trim()) || approveOfflinePayment.isPending} onClick={() => void approvePayment()} variant="primary">{t('booking.confirmAction')}</Button>
+          </div>
+        </div>
+      </Modal>}
+      {cancelOpen && <div className="booking-cancel-confirm" role="group"><span>{t('booking.cancelConfirm')}</span><Button disabled={cancelBooking.isPending} onClick={() => void cancelBooking.mutateAsync({ reason: 'Staff cancellation' }).then(() => { setCancelOpen(false); navigate('/admin/bookings') }).catch(() => setActionError(true))} variant="danger">{t('booking.confirmAction')}</Button><Button onClick={() => setCancelOpen(false)} variant="secondary">{t('booking.back')}</Button></div>}
     </div>
   )
 }

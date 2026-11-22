@@ -16,7 +16,7 @@ npm ci
 npm run dev
 ```
 
-The development server uses the MSW mock API by default. Set `VITE_USE_MOCKS=false` and `VITE_API_BASE_URL` to use a backend instead. The mock login accounts are listed in `src/mocks/fixtures.ts`; their shared demo password is `DEMO_PASSWORD` in that file and is for local development only.
+Set `VITE_USE_MOCKS=false` and `VITE_API_BASE_URL=http://localhost:4000/api/v1` in `.env.local` to use the real backend. When the API cannot be reached, the app displays a backend-unavailable notification. Set `VITE_USE_MOCKS=true` to use the MSW mock API instead. The mock login accounts are listed in `src/mocks/fixtures.ts`; their shared demo password is `DEMO_PASSWORD` in that file and is for local development only.
 
 ## Validation
 

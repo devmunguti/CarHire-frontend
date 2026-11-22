@@ -6,15 +6,17 @@ import type { StkInitiation, StkStatus } from '../../api/types'
 import { Button, PhoneInput } from '../../components/ui'
 import { isKenyanPhone, maskKenyanPhone, normalisePhone } from '../../lib'
 
-type PaymentState = 'idle' | 'waiting' | 'confirmed' | 'failed' | 'timeout' | 'manual_refund'
+type PaymentState = 'idle' | 'waiting' | 'partial' | 'confirmed' | 'failed' | 'timeout' | 'manual_refund'
 
 export function PaymentStatus({
   bookingId,
+  bookingReference,
   amountDueKes,
   initialPhone = '',
   onConfirmed,
 }: {
   bookingId: string
+  bookingReference: string
   amountDueKes: number
   initialPhone?: string
   onConfirmed?: () => void
@@ -26,6 +28,7 @@ export function PaymentStatus({
   const [paymentState, setPaymentState] = useState<PaymentState>('idle')
   const [secondsRemaining, setSecondsRemaining] = useState(120)
   const [paidAmountKes, setPaidAmountKes] = useState<number | undefined>()
+  const [balanceDueKes, setBalanceDueKes] = useState<number | undefined>()
   const [error, setError] = useState<string | null>(null)
   const [manualMessage, setManualMessage] = useState<string | null>(null)
   const deadline = useRef(0)
@@ -35,8 +38,9 @@ export function PaymentStatus({
     if (pollInFlight.current) return
     pollInFlight.current = true
     try {
-      const result = await apiClient.get<StkStatus>(`/payments/${encodeURIComponent(id)}/status`)
+      const result = await apiClient.get<StkStatus>(`/bookings/${encodeURIComponent(bookingReference)}/payments/${encodeURIComponent(id)}/status`)
       setPaidAmountKes(result.paidAmountKes)
+      setBalanceDueKes(result.balanceDueKes)
       if (result.outcome === 'confirmed') {
         setPaymentState('confirmed')
         setManualMessage(null)
@@ -49,6 +53,8 @@ export function PaymentStatus({
       } else if (result.outcome === 'manual_refund') {
         setPaymentState('manual_refund')
         setError(result.message ?? 'This late payment was flagged for manual refund.')
+      } else if (result.outcome === 'partial') {
+        setPaymentState('partial')
       } else if (paymentState === 'timeout') {
         setManualMessage('The payment is still processing. Check again shortly.')
       }
@@ -57,7 +63,7 @@ export function PaymentStatus({
     } finally {
       pollInFlight.current = false
     }
-  }, [bookingId, onConfirmed, paymentState, queryClient])
+  }, [bookingId, bookingReference, onConfirmed, paymentState, queryClient])
 
   useEffect(() => {
     if (paymentState !== 'waiting' || !paymentId) return
@@ -81,10 +87,9 @@ export function PaymentStatus({
       return
     }
     try {
-      const result = await apiClient.post<StkInitiation>(`/bookings/${encodeURIComponent(bookingId)}/payments/stk`, {
+      const result = await apiClient.post<StkInitiation>(`/bookings/${encodeURIComponent(bookingReference)}/payments/stk`, {
         phone: normalisePhone(phone),
-        amountKes: amountDueKes,
-      })
+      }, { headers: { 'Idempotency-Key': crypto.randomUUID() } })
       setPaymentId(result.paymentId)
       setMaskedPhone(result.maskedPhone || maskKenyanPhone(phone))
       deadline.current = Date.now() + 120_000
@@ -112,11 +117,12 @@ export function PaymentStatus({
   }
 
   const amountMismatch = paymentState === 'confirmed' && paidAmountKes !== undefined && paidAmountKes !== amountDueKes
+  const currentAmountDueKes = balanceDueKes ?? amountDueKes
 
   return (
     <section aria-live="polite" className="payment-status" data-state={paymentState}>
       {paymentState === 'idle' && <>
-        <div className="payment-status__heading"><Smartphone aria-hidden="true" size={20} /><div><h3>Pay by M-Pesa</h3><p>Amount due: KES {new Intl.NumberFormat('en-KE').format(amountDueKes)}</p></div></div>
+        <div className="payment-status__heading"><Smartphone aria-hidden="true" size={20} /><div><h3>Pay by M-Pesa</h3><p>Amount due: KES {new Intl.NumberFormat('en-KE').format(currentAmountDueKes)}</p></div></div>
         <PhoneInput error={error ?? undefined} label="M-Pesa phone number" onChange={setPhone} value={phone} />
         <Button disabled={!isKenyanPhone(phone)} onClick={() => void initiatePayment()}><Smartphone aria-hidden="true" size={17} /> Send payment request</Button>
       </>}
@@ -131,6 +137,11 @@ export function PaymentStatus({
         <h3>Payment confirmed</h3>
         <p>API-confirmed payment for {maskedPhone}.</p>
         {amountMismatch && <p className="payment-status__warning" role="alert"><AlertTriangle aria-hidden="true" size={17} /> Paid amount differs from the amount due. Review before handover.</p>}
+      </div>}
+      {paymentState === 'partial' && <div className="payment-status__state">
+        <AlertTriangle aria-hidden="true" size={24} /><h3>Partial payment received</h3>
+        <p>Paid so far: KES {new Intl.NumberFormat('en-KE').format(paidAmountKes ?? 0)}. Balance due: KES {new Intl.NumberFormat('en-KE').format(balanceDueKes ?? 0)}.</p>
+        <Button onClick={retryPayment} variant="secondary">Pay remaining balance</Button>
       </div>}
       {paymentState === 'failed' && <div className="payment-status__state">
         <XCircle aria-hidden="true" size={24} /><h3>Payment failed</h3><p>{error}</p>

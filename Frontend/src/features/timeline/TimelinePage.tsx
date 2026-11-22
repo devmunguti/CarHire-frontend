@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Timeline, { DateHeader, SidebarHeader, TimelineHeaders } from 'react-calendar-timeline'
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 import 'react-calendar-timeline/style.css'
 import { AlertTriangle, CalendarDays, Clock3 } from 'lucide-react'
 import { useBookingList, useIncidents, useMaintenanceWindows, useVehicles } from '../../api/queries'
@@ -12,9 +13,8 @@ import { buildBookingPrefillUrl, buildTimelineItems, getTimelineStatusColor, typ
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function todayStart() {
-  const date = new Date()
-  date.setHours(0, 0, 0, 0)
-  return date.getTime()
+  const date = formatInTimeZone(new Date(), 'Africa/Nairobi', 'yyyy-MM-dd')
+  return fromZonedTime(`${date}T00:00:00`, 'Africa/Nairobi').getTime()
 }
 
 const statusLegend: { status: Booking['status']; label: string }[] = [

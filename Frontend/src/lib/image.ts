@@ -1,3 +1,12 @@
+export const MAX_OPERATION_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
+export const MAX_OPERATION_PHOTOS = 10
+
+const operationPhotoTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+export function isAllowedOperationPhoto(file: File) {
+  return operationPhotoTypes.has(file.type) && file.size <= MAX_OPERATION_PHOTO_SIZE_BYTES
+}
+
 export async function compressImage(file: File): Promise<File> {
   if (!file.type.startsWith('image/') || typeof createImageBitmap !== 'function') return file
 

@@ -1,11 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { isMockApiEnabled } from './api/config'
 import App from './App'
 import './App.css'
 import './index.css'
 
 async function startApp() {
-  if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCKS !== 'false') {
+  if (isMockApiEnabled) {
     const { worker } = await import('./mocks/browser')
     await worker.start()
   }

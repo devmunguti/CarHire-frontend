@@ -21,7 +21,7 @@ const BookingPage = lazy(() => import('./features/bookings/GuestCheckoutPage').t
 const BookingConfirmationPage = lazy(() => import('./features/bookings/GuestCheckoutPage').then((module) => ({ default: () => <module.GuestBookingPage confirmation /> })))
 const LoginPage = lazy(() => import('./features/auth/LoginPage').then((module) => ({ default: module.LoginPage })))
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
-const FleetPage = lazy(() => import('./pages/admin').then((module) => ({ default: module.FleetPage })))
+const FleetPage = lazy(() => import('./features/fleet/FleetPage').then((module) => ({ default: module.FleetPage })))
 const BookingsPage = lazy(() => import('./features/bookings/BookingsListPage').then((module) => ({ default: module.BookingsListPage })))
 const BookingWizardPage = lazy(() => import('./features/bookings/BookingWizard').then((module) => ({ default: module.BookingWizard })))
 const BookingDetailPage = lazy(() => import('./features/bookings/BookingDetailPage').then((module) => ({ default: module.BookingDetailPage })))

@@ -175,6 +175,7 @@ export const en: Record<string, string> = {
   'admin.searchBooking': 'Booking',
   'admin.searchCustomer': 'Customer',
   'admin.offline': 'You are offline. Changes may not sync until connection returns.',
+  'backend.unavailable': 'The backend is unavailable. Check that the backend server is running.',
   'admin.systemAlerts': 'System alerts',
   'admin.incidentAlert': 'Open breakdown incidents need attention.',
   'admin.openIncident': 'Open incident',

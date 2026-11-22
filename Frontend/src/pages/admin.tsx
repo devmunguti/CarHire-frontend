@@ -1,11 +1,18 @@
-import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { Button, ConfirmDialog, DataTable, Input, Modal, Select, Toast } from '../components/ui'
+import { useState, type FormEvent } from 'react'
+import { Button, ConfirmDialog, DataTable, ErrorState, Input, Modal, Select, Skeleton, Toast } from '../components/ui'
 import { useAuth } from '../hooks/AuthContext'
 import { canApproveBooking } from '../hooks/useCan'
 import { useTranslation } from '../i18n'
-import type { AuditEntry, Booking, PaymentMethod, StaffMember, UserRole } from '../api/types'
-import { auditEntries as initialAuditEntries, bookings as initialBookings, staffMembers as initialStaffMembers } from '../mocks/fixtures'
+import {
+  useApproveOfflinePayment,
+  useAuditEntries,
+  useInviteStaff,
+  usePendingApprovals,
+  useStaff,
+  useUpdateStaff,
+} from '../api/queries'
+import type { AuditEntry, Booking, OfflineApprovalRequest, StaffInvitationRequest, StaffMember, UserRole } from '../api/types'
+import { DashboardPage as DashboardViewPage } from '../features/dashboard/DashboardPage'
 import { PagePlaceholder } from './PagePlaceholder'
 
 const paymentMethods = [
@@ -37,8 +44,7 @@ function formatAge(value: string | undefined) {
   const diffMs = Date.now() - new Date(value).getTime()
   const hours = Math.max(0, Math.floor(diffMs / (60 * 60 * 1000)))
   const minutes = Math.max(0, Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000)))
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes}m`
+  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`
 }
 
 function formatHoldRemaining(value: string | undefined) {
@@ -48,30 +54,77 @@ function formatHoldRemaining(value: string | undefined) {
   const minutes = Math.max(0, Math.ceil(diffMs / (60 * 1000)))
   if (minutes >= 60) {
     const hours = Math.floor(minutes / 60)
-    const remainingMinutes = minutes % 60
-    return `${hours}h ${remainingMinutes}m`
+    return `${hours}h ${minutes % 60}m`
   }
   return `${minutes}m`
 }
 
-function DashboardPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.dashboard')} /> }
-function FleetPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.fleet')} /> }
-function BookingsPage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.bookings')} /> }
-function ProfilePage() { const { t } = useTranslation(); return <PagePlaceholder title={t('page.profile')} /> }
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : 'The request could not be completed.'
+}
+
+function localDateToUtcStart(value: string) {
+  return value ? new Date(`${value}T00:00:00+03:00`).toISOString() : undefined
+}
+
+function localDateToUtcEnd(value: string) {
+  return value ? new Date(`${value}T23:59:59.999+03:00`).toISOString() : undefined
+}
+
+function BookingsPage() {
+  const { t } = useTranslation()
+  return <PagePlaceholder title={t('page.bookings')} />
+}
+
+export function ProfilePage() {
+  const { user, updateProfile } = useAuth()
+  const [name, setName] = useState(user?.name ?? '')
+  const [phone, setPhone] = useState(user?.phone ?? '')
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setSaving(true)
+    setNotice(null)
+    setError(null)
+    try {
+      await updateProfile({ name: name.trim(), phone: phone.trim() })
+      setNotice('Profile updated.')
+    } catch (requestError) {
+      setError(errorMessage(requestError))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="page-shell">
+      <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Profile</h1></div></header>
+      <form className="card-panel stack stack--md" onSubmit={(event) => void submit(event)}>
+        <Input label="Full name" onChange={(event) => setName(event.target.value)} required value={name} />
+        <Input label="Email" readOnly value={user?.email ?? ''} />
+        <Input label="Phone" onChange={(event) => setPhone(event.target.value)} required value={phone} />
+        {notice && <p role="status">{notice}</p>}
+        {error && <p className="field__error" role="alert">{error}</p>}
+        <Button disabled={saving} type="submit">{saving ? 'Saving…' : 'Save profile'}</Button>
+      </form>
+    </section>
+  )
+}
 
 export function ApprovalsPage() {
   const { user } = useAuth()
-  const queryClient = useQueryClient()
-  const [approvals, setApprovals] = useState(() => initialBookings
-    .filter((booking) => booking.status === 'reserved' && booking.pendingApproval !== false)
-    .sort((left, right) => (left.holdExpiresAt ?? left.pickupAt).localeCompare(right.holdExpiresAt ?? right.pickupAt)))
+  const approvals = usePendingApprovals()
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  const [paymentMethod, setPaymentMethod] = useState<OfflineApprovalRequest['paymentMethod']>('cash')
   const [reference, setReference] = useState('')
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [confirmStep, setConfirmStep] = useState(false)
+  const approvalMutation = useApproveOfflinePayment(selectedBooking?.id ?? '')
 
   const availableMethods = user?.role === 'agent'
     ? paymentMethods.filter((option) => option.value !== 'corporate')
@@ -93,91 +146,79 @@ export function ApprovalsPage() {
   }
 
   async function submitApproval() {
-    if (!selectedBooking) return
-    if (!user) return
-
+    if (!selectedBooking || !user) return
     if (!canApproveBooking(user.id, selectedBooking.createdById ?? '')) {
       setError('This booking was created by the current user and cannot be approved.')
       return
     }
-
-    if (!paymentMethod) {
-      setError('Payment method is required.')
-      return
-    }
-
     if (!reference.trim()) {
       setError('Payment reference or receipt code is required.')
       return
     }
-
     if (paymentMethod === 'corporate' && !reason.trim()) {
       setError('Reason is required for corporate override.')
       return
     }
-
     if (selectedBooking.holdExpiresAt && Date.parse(selectedBooking.holdExpiresAt) <= Date.now()) {
       setError('This booking hold has expired. Recheck availability and reserve the vehicle again.')
       return
     }
 
-    setApprovals((current) => current.filter((booking) => booking.id !== selectedBooking.id))
-    setToast('Offline approval recorded successfully.')
-    queryClient.invalidateQueries({ queryKey: ['bookings'] })
-    queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-    closeApproval()
+    try {
+      await approvalMutation.mutateAsync({ paymentMethod, reference: reference.trim(), reason: reason.trim() || undefined })
+      setToast('Offline approval recorded successfully.')
+      closeApproval()
+    } catch (requestError) {
+      setError(errorMessage(requestError))
+    }
   }
 
-  const approvalRows = approvals
-    .map((booking) => ({
-      ...booking,
-      canApprove: canApproveBooking(user?.id ?? '', booking.createdById ?? ''),
-    }))
+  const rows = (approvals.data ?? []).map((booking) => ({
+    ...booking,
+    canApprove: canApproveBooking(user?.id ?? '', booking.createdById ?? ''),
+  }))
 
   return (
     <section className="page-shell">
       <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Approvals</h1></div></header>
       <div className="stack stack--lg">
         <div className="card-panel">
-          <DataTable
-            columns={[
-              { key: 'booking', header: 'Booking', render: (row: Booking) => <><strong>{row.reference}</strong><div className="muted">{row.customerName}</div></> },
-              { key: 'vehicle', header: 'Vehicle', render: (row: Booking) => {
-                const vehicle = initialBookings.find((item) => item.id === row.id)
-                return <span>{vehicle ? vehicle.reference : row.vehicleId}</span>
-              } },
-              { key: 'age', header: 'Age', render: (row: Booking) => <span>{formatAge(row.pickupAt)}</span> },
-              { key: 'hold', header: 'Hold', render: (row: Booking) => <span>{formatHoldRemaining(row.holdExpiresAt)}</span> },
-              { key: 'amount', header: 'Amount', render: (row: Booking) => <strong>{new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(row.totalKes)}</strong> },
-              { key: 'action', header: 'Action', render: (row: Booking & { canApprove: boolean }) => (
-                <Button disabled={!row.canApprove} onClick={() => openApproval(row)} size="sm" variant={row.canApprove ? 'primary' : 'secondary'}>
-                  {row.canApprove ? 'Approve' : 'Locked'}
-                </Button>
-              ) },
-            ]}
-            empty={<div className="empty-state">No bookings are waiting approval.</div>}
-            rowKey={(row) => row.id}
-            rows={approvalRows}
-          />
+          {approvals.isLoading && <Skeleton rows={4} />}
+          {approvals.isError && <ErrorState onRetry={() => void approvals.refetch()} retryLabel="Retry" title={errorMessage(approvals.error)} />}
+          {!approvals.isLoading && !approvals.isError && (
+            <DataTable
+              columns={[
+                { key: 'booking', header: 'Booking', render: (row: Booking) => <><strong>{row.reference}</strong><div className="muted">{row.customerName}</div></> },
+                { key: 'vehicle', header: 'Vehicle', render: (row: Booking) => row.vehicleName ?? row.vehicleRegistration ?? row.vehicleId },
+                { key: 'age', header: 'Age', render: (row: Booking) => <span>{formatAge(row.createdAt ?? row.pickupAt)}</span> },
+                { key: 'hold', header: 'Hold', render: (row: Booking) => <span>{formatHoldRemaining(row.holdExpiresAt)}</span> },
+                { key: 'amount', header: 'Amount', render: (row: Booking) => <strong>{new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(row.totalKes)}</strong> },
+                { key: 'action', header: 'Action', render: (row: Booking & { canApprove: boolean }) => (
+                  <Button disabled={!row.canApprove} onClick={() => openApproval(row)} size="sm" variant={row.canApprove ? 'primary' : 'secondary'}>
+                    {row.canApprove ? 'Approve' : 'Locked'}
+                  </Button>
+                ) },
+              ]}
+              empty={<div className="empty-state">No bookings are waiting approval.</div>}
+              rowKey={(row) => row.id}
+              rows={rows}
+            />
+          )}
         </div>
       </div>
       {selectedBooking && (
-        <Modal open={Boolean(selectedBooking)} title="Approve offline payment" onClose={closeApproval}>
+        <Modal open title="Approve offline payment" onClose={closeApproval}>
           {!confirmStep ? (
             <div className="modal-body stack stack--md">
-              <div className="field-group">
-                <Select
-                  error={error ?? undefined}
-                  label="Payment method"
-                  onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
-                  options={availableMethods.map((method) => ({ value: method.value, label: method.label }))}
-                  value={paymentMethod}
-                />
-                {user?.role === 'agent' && (
-                  <p className="field__hint" title="Manager approval required">Corporate Credit is unavailable for agents.</p>
-                )}
-              </div>
-              <Input error={error ? undefined : undefined} label="Payment reference / receipt code" onChange={(event) => setReference(event.target.value)} value={reference} />
+              <Select
+                error={error ?? undefined}
+                label="Payment method"
+                onChange={(event) => setPaymentMethod(event.target.value as OfflineApprovalRequest['paymentMethod'])}
+                options={availableMethods.map((method) => ({ value: method.value, label: method.label }))}
+                value={paymentMethod}
+              />
+              {user?.role === 'agent' && <p className="field__hint" title="Manager approval required">Corporate Credit is unavailable for agents.</p>}
+              <Input label="Payment reference / receipt code" onChange={(event) => setReference(event.target.value)} value={reference} />
               <Input label="Reason" onChange={(event) => setReason(event.target.value)} placeholder={paymentMethod === 'corporate' ? 'Required for corporate override' : 'Optional notes'} value={reason} />
               {error && <p className="field__error" role="alert">{error}</p>}
               <div className="confirm-dialog__actions">
@@ -199,14 +240,16 @@ export function ApprovalsPage() {
           ) : (
             <div className="modal-body stack stack--md">
               <div className="info-grid">
-                <div><span className="label">Vehicle</span><strong>{selectedBooking.vehicleId}</strong></div>
+                <div><span className="label">Vehicle</span><strong>{selectedBooking.vehicleName ?? selectedBooking.vehicleRegistration ?? selectedBooking.vehicleId}</strong></div>
                 <div><span className="label">Amount</span><strong>{new Intl.NumberFormat('en-KE', { style: 'currency', currency: 'KES', maximumFractionDigits: 0 }).format(selectedBooking.totalKes)}</strong></div>
                 <div><span className="label">Payment</span><strong>{paymentMethods.find((option) => option.value === paymentMethod)?.label}</strong></div>
               </div>
               {error && <p className="field__error" role="alert">{error}</p>}
               <div className="confirm-dialog__actions">
                 <Button onClick={() => setConfirmStep(false)} variant="secondary">Back</Button>
-                <Button onClick={submitApproval} variant="primary">Confirm approval</Button>
+                <Button disabled={approvalMutation.isPending} onClick={() => void submitApproval()} variant="primary">
+                  {approvalMutation.isPending ? 'Saving…' : 'Confirm approval'}
+                </Button>
               </div>
             </div>
           )}
@@ -219,122 +262,147 @@ export function ApprovalsPage() {
 
 export function StaffPage() {
   const { user } = useAuth()
-  const [staff, setStaff] = useState<StaffMember[]>(initialStaffMembers)
-  const [invite, setInvite] = useState({ name: '', email: '', phone: '', role: 'agent', branch: 'Nairobi HQ' })
+  const staff = useStaff()
+  const inviteMutation = useInviteStaff()
+  const updateMutation = useUpdateStaff()
+  const [invite, setInvite] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'agent' as UserRole,
+    branch: user?.branch ?? 'Nairobi HQ',
+    languages: 'English, Kiswahili',
+    licenceClass: '',
+    licenceExpiresAt: '',
+    psvExpiresAt: '',
+  })
   const [memberToDeactivate, setMemberToDeactivate] = useState<StaffMember | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const roleChoices = user?.role === 'manager'
     ? roleOptions.filter((option) => option.value !== 'owner')
     : roleOptions
 
-  function applyInvite(event: React.FormEvent<HTMLFormElement>) {
+  async function applyInvite(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    setNotice(null)
+    setError(null)
     if (!invite.name.trim() || !invite.email.trim() || !invite.phone.trim()) {
-      setNotice('Name, email and phone are required.')
+      setError('Name, email and phone are required.')
       return
     }
-    if (user?.role === 'manager' && invite.role === 'owner') {
-      setNotice('Managers cannot create owner accounts.')
-      return
-    }
-
-    const newMember: StaffMember = {
-      id: `usr-${Date.now()}`,
+    const request: StaffInvitationRequest = {
       name: invite.name.trim(),
       email: invite.email.trim(),
       phone: invite.phone.trim(),
-      role: invite.role as UserRole,
-      branch: invite.branch || 'Nairobi HQ',
-      active: true,
-      lastLogin: 'Never',
+      role: invite.role,
+      branch: invite.branch.trim(),
     }
-    setStaff((current) => [newMember, ...current])
-    setInvite({ name: '', email: '', phone: '', role: 'agent', branch: 'Nairobi HQ' })
-    setNotice('Staff invite added successfully.')
+    if (invite.role === 'driver') {
+      if (!invite.licenceClass || !invite.licenceExpiresAt || !invite.psvExpiresAt) {
+        setError('Driver licence class and expiry dates are required.')
+        return
+      }
+      request.driverProfile = {
+        languages: invite.languages.split(',').map((language) => language.trim()).filter(Boolean),
+        licenceClass: invite.licenceClass.trim(),
+        licenceExpiresAt: new Date(`${invite.licenceExpiresAt}T00:00:00+03:00`).toISOString(),
+        psvExpiresAt: new Date(`${invite.psvExpiresAt}T00:00:00+03:00`).toISOString(),
+      }
+    }
+    try {
+      const created = await inviteMutation.mutateAsync(request)
+      setNotice(`Invitation sent to ${created.email}. It expires ${formatTime(created.expiresAt)}.`)
+      setInvite((current) => ({ ...current, name: '', email: '', phone: '' }))
+    } catch (requestError) {
+      setError(errorMessage(requestError))
+    }
   }
 
-  function updateRole(member: StaffMember, role: UserRole) {
-    if (user?.role === 'manager' && member.role === 'owner') {
-      setNotice('Managers cannot demote an owner.')
-      return
+  async function updateRole(member: StaffMember, role: UserRole) {
+    setError(null)
+    try {
+      await updateMutation.mutateAsync({ id: member.id, request: { role } })
+    } catch (requestError) {
+      setError(errorMessage(requestError))
     }
-    if (member.id === user?.id) {
-      setNotice('You cannot change your own role.')
-      return
-    }
-    setStaff((current) => current.map((person) => person.id === member.id ? { ...person, role } : person))
   }
 
-  function deactivateMember(member: StaffMember) {
-    if (member.id === user?.id) {
-      setNotice('You cannot deactivate your own account.')
-      return
+  async function updateActive(member: StaffMember, active: boolean) {
+    setError(null)
+    try {
+      await updateMutation.mutateAsync({ id: member.id, request: { active } })
+      setMemberToDeactivate(null)
+      setNotice(active ? 'The staff account has been reactivated.' : 'The staff member has been deactivated and logged out.')
+    } catch (requestError) {
+      setError(errorMessage(requestError))
     }
-    const ownerCount = staff.filter((person) => person.role === 'owner' && person.active).length
-    if (member.role === 'owner' && ownerCount <= 1) {
-      setNotice('The last owner cannot be removed.')
-      return
-    }
-    setMemberToDeactivate(member)
   }
 
-  function deactivateConfirmed() {
-    if (!memberToDeactivate) return
-    setStaff((current) => current.map((person) => person.id === memberToDeactivate.id ? { ...person, active: false } : person))
-    setMemberToDeactivate(null)
-    setNotice('The staff member has been deactivated and will be logged out immediately.')
-  }
-
-  function reactivateMember(member: StaffMember) {
-    setStaff((current) => current.map((person) => person.id === member.id ? { ...person, active: true } : person))
-  }
+  const rows = staff.data ?? []
+  const activeOwners = rows.filter((member) => member.role === 'owner' && member.active).length
 
   return (
     <section className="page-shell">
       <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Staff</h1></div></header>
       <div className="split-layout">
         <div className="card-panel">
-          <DataTable
-            columns={[
-              { key: 'name', header: 'Name', render: (row: StaffMember) => <><strong>{row.name}</strong><div className="muted">{row.email}</div></> },
-              { key: 'phone', header: 'Phone', render: (row: StaffMember) => row.phone },
-              { key: 'role', header: 'Role', render: (row: StaffMember) => (
-                <Select
-                  label="Role"
-                  onChange={(event) => updateRole(row, event.target.value as UserRole)}
-                  options={(user?.role === 'manager' && row.role === 'owner'
-                    ? [...roleChoices, { value: 'owner' as const, label: 'Owner' }]
-                    : roleChoices).map((option) => ({ value: option.value, label: option.label }))}
-                  value={row.role}
-                />
-              ) },
-              { key: 'branch', header: 'Branch', render: (row: StaffMember) => row.branch },
-              { key: 'status', header: 'Active', render: (row: StaffMember) => row.active ? 'Yes' : 'No' },
-              { key: 'last', header: 'Last login', render: (row: StaffMember) => row.lastLogin === 'Never' ? 'Never' : formatTime(row.lastLogin) },
-              { key: 'toggle', header: 'Actions', render: (row: StaffMember) => (
-                <div className="inline-actions">
-                  {row.active
-                    ? <Button disabled={row.id === user?.id || (row.role === 'owner' && staff.filter((member) => member.role === 'owner' && member.active).length <= 1)} onClick={() => deactivateMember(row)} size="sm" variant="secondary">Deactivate</Button>
-                    : <Button onClick={() => reactivateMember(row)} size="sm" variant="primary">Reactivate</Button>}
-                </div>
-              ) },
-            ]}
-            empty={<div className="empty-state">No staff records found.</div>}
-            rowKey={(row) => row.id}
-            rows={staff}
-          />
+          {staff.isLoading && <Skeleton rows={5} />}
+          {staff.isError && <ErrorState onRetry={() => void staff.refetch()} retryLabel="Retry" title={errorMessage(staff.error)} />}
+          {!staff.isLoading && !staff.isError && (
+            <DataTable
+              columns={[
+                { key: 'name', header: 'Name', render: (row: StaffMember) => <><strong>{row.name}</strong><div className="muted">{row.email}</div></> },
+                { key: 'phone', header: 'Phone', render: (row: StaffMember) => row.phone },
+                { key: 'role', header: 'Role', render: (row: StaffMember) => (
+                  <Select
+                    disabled={row.id === user?.id || (user?.role === 'manager' && row.role === 'owner')}
+                    label={`Role for ${row.name}`}
+                    onChange={(event) => void updateRole(row, event.target.value as UserRole)}
+                    options={roleChoices.map((option) => ({ value: option.value, label: option.label }))}
+                    value={row.role}
+                  />
+                ) },
+                { key: 'branch', header: 'Branch', render: (row: StaffMember) => row.branch },
+                { key: 'status', header: 'Active', render: (row: StaffMember) => row.active ? 'Yes' : 'No' },
+                { key: 'last', header: 'Last login', render: (row: StaffMember) => formatTime(row.lastLogin) },
+                { key: 'toggle', header: 'Actions', render: (row: StaffMember) => (
+                  <Button
+                    disabled={row.id === user?.id || (row.role === 'owner' && row.active && activeOwners <= 1) || updateMutation.isPending}
+                    onClick={() => row.active ? setMemberToDeactivate(row) : void updateActive(row, true)}
+                    size="sm"
+                    variant="secondary"
+                  >
+                    {row.active ? 'Deactivate' : 'Reactivate'}
+                  </Button>
+                ) },
+              ]}
+              empty={<div className="empty-state">No staff records found.</div>}
+              rowKey={(row) => row.id}
+              rows={rows}
+            />
+          )}
         </div>
         <aside className="card-panel">
           <h2>Invite staff</h2>
-          <form className="stack stack--md" onSubmit={applyInvite}>
-            <Input label="Full name" onChange={(event) => setInvite((current) => ({ ...current, name: event.target.value }))} value={invite.name} />
-            <Input label="Email" onChange={(event) => setInvite((current) => ({ ...current, email: event.target.value }))} type="email" value={invite.email} />
-            <Input label="Phone" onChange={(event) => setInvite((current) => ({ ...current, phone: event.target.value }))} type="tel" value={invite.phone} />
-            <Select label="Role" onChange={(event) => setInvite((current) => ({ ...current, role: event.target.value }))} options={roleChoices.map((option) => ({ value: option.value, label: option.label }))} value={invite.role} />
-            <Input label="Branch" onChange={(event) => setInvite((current) => ({ ...current, branch: event.target.value }))} value={invite.branch} />
+          <form className="stack stack--md" onSubmit={(event) => void applyInvite(event)}>
+            <Input label="Full name" onChange={(event) => setInvite((current) => ({ ...current, name: event.target.value }))} required value={invite.name} />
+            <Input label="Email" onChange={(event) => setInvite((current) => ({ ...current, email: event.target.value }))} required type="email" value={invite.email} />
+            <Input label="Phone" onChange={(event) => setInvite((current) => ({ ...current, phone: event.target.value }))} required type="tel" value={invite.phone} />
+            <Select label="Role" onChange={(event) => setInvite((current) => ({ ...current, role: event.target.value as UserRole }))} options={roleChoices.map((option) => ({ value: option.value, label: option.label }))} value={invite.role} />
+            <Input label="Branch" onChange={(event) => setInvite((current) => ({ ...current, branch: event.target.value }))} required value={invite.branch} />
+            {invite.role === 'driver' && (
+              <>
+                <Input label="Languages (comma-separated)" onChange={(event) => setInvite((current) => ({ ...current, languages: event.target.value }))} required value={invite.languages} />
+                <Input label="Licence class" onChange={(event) => setInvite((current) => ({ ...current, licenceClass: event.target.value }))} required value={invite.licenceClass} />
+                <Input label="Licence expiry" onChange={(event) => setInvite((current) => ({ ...current, licenceExpiresAt: event.target.value }))} required type="date" value={invite.licenceExpiresAt} />
+                <Input label="PSV expiry" onChange={(event) => setInvite((current) => ({ ...current, psvExpiresAt: event.target.value }))} required type="date" value={invite.psvExpiresAt} />
+              </>
+            )}
             {notice && <p className="field__hint" role="status">{notice}</p>}
-            <Button type="submit">Invite staff</Button>
+            {error && <p className="field__error" role="alert">{error}</p>}
+            <Button disabled={inviteMutation.isPending} type="submit">{inviteMutation.isPending ? 'Sending…' : 'Invite staff'}</Button>
           </form>
         </aside>
       </div>
@@ -343,7 +411,7 @@ export function StaffPage() {
         confirmLabel="Deactivate"
         description={memberToDeactivate ? `This will log out ${memberToDeactivate.name} immediately and lock them out of the workspace.` : 'This will log the user out immediately.'}
         onCancel={() => setMemberToDeactivate(null)}
-        onConfirm={memberToDeactivate ? deactivateConfirmed : () => undefined}
+        onConfirm={() => memberToDeactivate && void updateActive(memberToDeactivate, false)}
         open={Boolean(memberToDeactivate)}
         title="Deactivate staff member"
       />
@@ -359,24 +427,22 @@ export function AuditPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
+  const audit = useAuditEntries({
+    ...(actorFilter !== 'all' ? { actorId: actorFilter } : {}),
+    ...(actionFilter !== 'all' ? { action: actionFilter } : {}),
+    ...(entityFilter !== 'all' ? { entity: entityFilter } : {}),
+    ...(localDateToUtcStart(fromDate) ? { from: localDateToUtcStart(fromDate) } : {}),
+    ...(localDateToUtcEnd(toDate) ? { to: localDateToUtcEnd(toDate) } : {}),
+  })
 
   if (!user || user.role !== 'owner') {
     return <section className="page-shell"><div className="card-panel"><h1>Access denied</h1><p>You must be an owner to view the audit log.</p></div></section>
   }
 
-  const actorOptions = ['all', ...new Set((initialAuditEntries as AuditEntry[]).map((entry) => entry.actor))]
-  const actionOptions = ['all', ...new Set((initialAuditEntries as AuditEntry[]).map((entry) => entry.action))]
-  const entityOptions = ['all', ...new Set((initialAuditEntries as AuditEntry[]).map((entry) => entry.entity))]
-
-  const filtered = (initialAuditEntries as AuditEntry[]).filter((entry) => {
-    const itemTime = new Date(entry.createdAt).getTime()
-    const from = fromDate ? new Date(fromDate).getTime() : Number.NEGATIVE_INFINITY
-    const to = toDate ? new Date(toDate).getTime() + 86_400_000 : Number.POSITIVE_INFINITY
-    const actorMatch = actorFilter === 'all' || entry.actor === actorFilter
-    const actionMatch = actionFilter === 'all' || entry.action === actionFilter
-    const entityMatch = entityFilter === 'all' || entry.entity === entityFilter
-    return itemTime >= from && itemTime <= to && actorMatch && actionMatch && entityMatch
-  })
+  const entries = audit.data ?? []
+  const actorOptions = ['all', ...new Set(entries.flatMap((entry) => entry.actorId ? [entry.actorId] : []))]
+  const actionOptions = ['all', ...new Set(entries.map((entry) => entry.action))]
+  const entityOptions = ['all', ...new Set(entries.map((entry) => entry.entity))]
 
   return (
     <section className="page-shell">
@@ -385,35 +451,47 @@ export function AuditPage() {
         <div className="filter-grid">
           <Input label="From date" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
           <Input label="To date" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
-          <Select label="Actor" onChange={(event) => setActorFilter(event.target.value)} options={actorOptions.map((value) => ({ value, label: value === 'all' ? 'All actors' : value }))} value={actorFilter} />
+          <Select label="Actor" onChange={(event) => setActorFilter(event.target.value)} options={actorOptions.map((value) => ({ value, label: value === 'all' ? 'All actors' : entries.find((entry) => entry.actorId === value)?.actor ?? value }))} value={actorFilter} />
           <Select label="Action" onChange={(event) => setActionFilter(event.target.value)} options={actionOptions.map((value) => ({ value, label: value === 'all' ? 'All actions' : value }))} value={actionFilter} />
           <Select label="Entity" onChange={(event) => setEntityFilter(event.target.value)} options={entityOptions.map((value) => ({ value, label: value === 'all' ? 'All entities' : value }))} value={entityFilter} />
         </div>
-        <DataTable
-          columns={[
-            { key: 'time', header: 'Time (EAT)', render: (row: AuditEntry) => <span>{formatTime(row.createdAt)}</span> },
-            { key: 'actor', header: 'Actor', render: (row: AuditEntry) => row.actor },
-            { key: 'action', header: 'Action', render: (row: AuditEntry) => row.action },
-            { key: 'entity', header: 'Entity', render: (row: AuditEntry) => row.entity },
-            { key: 'diff', header: 'Diff', render: (row: AuditEntry) => (
-              <button onClick={() => setExpanded((current) => ({ ...current, [row.id]: !current[row.id] }))} type="button">
-                {expanded[row.id] ? 'Hide diff' : 'View diff'}
-              </button>
-            ) },
-          ]}
-          empty={<div className="empty-state">No audit records match the selected filters.</div>}
-          rowKey={(row) => row.id}
-          rows={filtered}
-        />
-        {filtered.map((entry) => expanded[entry.id] && (
-          <div className="audit-diff" key={`${entry.id}-diff`}>
-            <h3>Before</h3><pre>{JSON.stringify(entry.before ?? {}, null, 2)}</pre>
-            <h3>After</h3><pre>{JSON.stringify(entry.after ?? {}, null, 2)}</pre>
-          </div>
-        ))}
+        {audit.isLoading && <Skeleton rows={5} />}
+        {audit.isError && <ErrorState onRetry={() => void audit.refetch()} retryLabel="Retry" title={errorMessage(audit.error)} />}
+        {!audit.isLoading && !audit.isError && (
+          <>
+            <DataTable
+              columns={[
+                { key: 'time', header: 'Time (EAT)', render: (row: AuditEntry) => <span>{formatTime(row.createdAt)}</span> },
+                { key: 'actor', header: 'Actor', render: (row: AuditEntry) => row.actor },
+                { key: 'action', header: 'Action', render: (row: AuditEntry) => row.action },
+                { key: 'entity', header: 'Entity', render: (row: AuditEntry) => row.entity },
+                { key: 'diff', header: 'Details', render: (row: AuditEntry) => (
+                  <button onClick={() => setExpanded((current) => ({ ...current, [row.id]: !current[row.id] }))} type="button">
+                    {expanded[row.id] ? 'Hide details' : 'View details'}
+                  </button>
+                ) },
+              ]}
+              empty={<div className="empty-state">No audit records match the selected filters.</div>}
+              rowKey={(row) => row.id}
+              rows={entries}
+            />
+            {entries.map((entry) => expanded[entry.id] && (
+              <div className="audit-diff" key={`${entry.id}-diff`}>
+                {entry.before || entry.after ? (
+                  <>
+                    <h3>Before</h3><pre>{JSON.stringify(entry.before ?? {}, null, 2)}</pre>
+                    <h3>After</h3><pre>{JSON.stringify(entry.after ?? {}, null, 2)}</pre>
+                  </>
+                ) : (
+                  <p>Change snapshots are not stored for this operation; request data is excluded from the audit log.</p>
+                )}
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </section>
   )
 }
 
-export { DashboardPage, FleetPage, BookingsPage, ProfilePage }
+export { DashboardViewPage as DashboardPage, BookingsPage }

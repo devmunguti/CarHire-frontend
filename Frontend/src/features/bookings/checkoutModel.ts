@@ -16,7 +16,7 @@ export function validateLicenceFile(file: File): string | null {
   return null
 }
 
-export function guestManageUrl(reference: string, token: string, confirmation = false) {
+export function guestManageUrl(reference: string, confirmation = false) {
   const suffix = confirmation ? '/confirmation' : ''
-  return `/booking/${encodeURIComponent(reference)}${suffix}?token=${encodeURIComponent(token)}`
+  return `/booking/${encodeURIComponent(reference)}${suffix}`
 }

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, ShieldCheck } from 'lucide-react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, apiClient } from '../../api/client'
 import type { GuestCheckoutData, GuestBookingAccess, GuestBookingSummary } from '../../api/types'
 import { Button, Checkbox, Input, PhoneInput, Skeleton } from '../../components/ui'
@@ -129,8 +129,9 @@ export function GuestCheckoutPage() {
     try {
       if (licenceFile) formData.set('licence', await compressImage(licenceFile))
       const result = await apiClient.upload<GuestBookingAccess>(`/bookings/${encodeURIComponent(bookingId)}/checkout`, formData, () => undefined)
+      await apiClient.post(`/bookings/${encodeURIComponent(result.booking.reference)}/guest`, { accessToken: result.accessToken })
       setAccess(result)
-      if (paymentMethod === 'cash') navigate(guestManageUrl(result.booking.reference, result.accessToken, true))
+      if (paymentMethod === 'cash') navigate(guestManageUrl(result.booking.reference, true))
     } catch (error) {
       if (error instanceof ApiError && error.code === 'HOLD_EXPIRED') setExpired(true)
       else setSubmitError(getErrorMessage(error))
@@ -146,8 +147,9 @@ export function GuestCheckoutPage() {
       <PaymentStatus
         amountDueKes={data.booking.totalKes}
         bookingId={data.booking.id}
+        bookingReference={access.booking.reference}
         initialPhone={normalisePhone(details.phone)}
-        onConfirmed={() => navigate(guestManageUrl(access.booking.reference, access.accessToken, true))}
+        onConfirmed={() => navigate(guestManageUrl(access.booking.reference, true))}
       />
     </div>
   }
@@ -223,7 +225,7 @@ function GuestAccessError() {
   return <section className="guest-checkout-message" role="alert"><AlertTriangle aria-hidden="true" size={30} /><h1>Booking link unavailable</h1><p>We could not verify this booking link. It may be invalid or expired. No booking details have been displayed.</p><Link className="button button--secondary" to="/vehicles">Browse vehicles</Link></section>
 }
 
-function GuestBookingDetails({ access, accessToken, onCancelled }: { access: GuestBookingSummary; accessToken: string; onCancelled: () => void }) {
+function GuestBookingDetails({ access, onCancelled }: { access: GuestBookingSummary; onCancelled: (refundPending: boolean) => void }) {
   const { booking, vehicle } = access
   const [cancelPrompt, setCancelPrompt] = useState(false)
   const [cancelError, setCancelError] = useState<string | null>(null)
@@ -236,10 +238,10 @@ function GuestBookingDetails({ access, accessToken, onCancelled }: { access: Gue
     setIsCancelling(true)
     setCancelError(null)
     try {
-      await apiClient.post(`/bookings/${encodeURIComponent(booking.reference)}/cancel`, undefined, { headers: { 'X-Booking-Access-Token': accessToken } })
+      await apiClient.post(`/bookings/${encodeURIComponent(booking.reference)}/cancel`)
       setCancelled(true)
       setCancelPrompt(false)
-      onCancelled()
+      onCancelled(paidKes > 0)
     } catch {
       setCancelError('We could not cancel this booking. Please contact our team.')
     } finally {
@@ -278,22 +280,19 @@ function GuestBookingDetails({ access, accessToken, onCancelled }: { access: Gue
 
 export function GuestBookingPage({ confirmation = false }: { confirmation?: boolean }) {
   const { ref = '' } = useParams()
-  const [searchParams] = useSearchParams()
-  const token = searchParams.get('token') ?? ''
   const [cancelled, setCancelled] = useState(false)
+  const [refundPending, setRefundPending] = useState(false)
   const guestQuery = useQuery({
-    queryKey: ['guest-booking', ref, token],
-    queryFn: () => apiClient.get<GuestBookingSummary>(`/bookings/${encodeURIComponent(ref)}/guest`, {
-      headers: { 'X-Booking-Access-Token': token },
-    }),
-    enabled: Boolean(ref && token),
+    queryKey: ['guest-booking', ref],
+    queryFn: () => apiClient.get<GuestBookingSummary>(`/bookings/${encodeURIComponent(ref)}/guest`),
+    enabled: Boolean(ref),
     retry: false,
   })
 
-  if (!token) return <GuestAccessError />
+  if (!ref) return <GuestAccessError />
   if (guestQuery.isLoading) return <div aria-label="Loading booking" className="guest-checkout-loading" role="status"><Skeleton rows={4} /></div>
   if (guestQuery.isError || !guestQuery.data) return <GuestAccessError />
-  if (cancelled) return <section className="guest-checkout-message"><h1>Booking cancelled</h1><p>Your cancellation request was processed.</p><Link className="button button--secondary" to="/">Return to AutoHire KE</Link></section>
+  if (cancelled) return <section className="guest-checkout-message"><h1>Booking cancelled</h1><p>{refundPending ? 'Your eligible full refund is awaiting owner review and processing.' : 'Your cancellation request was processed.'}</p><Link className="button button--secondary" to="/">Return to AutoHire KE</Link></section>
 
   const access = guestQuery.data
   const { booking } = access
@@ -302,13 +301,13 @@ export function GuestBookingPage({ confirmation = false }: { confirmation?: bool
 
   return <div className="guest-confirmation-page">
     {confirmation && <header className="guest-confirmation-heading"><span aria-hidden="true"><Check size={23} /></span><p>{booking.pendingApproval ? 'Booking request received' : isPaid ? 'Payment confirmed' : 'Booking reserved'}</p><h1>{booking.pendingApproval ? 'Your booking is pending approval' : 'You’re all set'}</h1></header>}
-    <GuestBookingDetails access={access} accessToken={token} onCancelled={() => setCancelled(true)} />
+    <GuestBookingDetails access={access} onCancelled={(hasRefund) => { setRefundPending(hasRefund); setCancelled(true) }} />
     {confirmation && <section className="guest-confirmation-notes">
       <h2>Deposit and pickup</h2>
       <p>The refundable security deposit is {formatKes(booking.pricingSnapshot?.refundableDepositKes ?? 0)}. It is returned after the vehicle is checked in, subject to the rental terms.</p>
       <p>Bring your original driving licence and National ID or passport to the branch. Your booking reference is <strong>{booking.reference}</strong>.</p>
       <p>Amount paid: <strong>{formatKes(paidKes)}</strong>{booking.pendingApproval ? ' · Pay at branch — pending approval' : ''}</p>
-      <Link className="button button--primary" to={guestManageUrl(booking.reference, token)}>Manage this booking</Link>
+      <Link className="button button--primary" to={guestManageUrl(booking.reference)}>Manage this booking</Link>
     </section>}
   </div>
 }

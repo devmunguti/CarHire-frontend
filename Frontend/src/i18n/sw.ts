@@ -125,6 +125,7 @@ export const sw: Record<string, string> = {
   'contact.form.success': 'Asante kwa kuwasiliana nasi. Tutakujibu hivi karibuni.',
   'contact.form.error': 'Ujumbe haukutumwa. Tafadhali jaribu tena.',
   'contact.form.rateLimit': 'Ujumbe mwingi umetumwa. Subiri kidogo kabla ya kujaribu tena.',
+  'backend.unavailable': 'Huduma ya nyuma haipatikani. Hakikisha seva ya huduma ya nyuma inaendelea kufanya kazi.',
   'contact.map.title': 'Tafuta tawi letu',
   'contact.map.loading': 'Inapakia ramani ya tawi',
   'contact.blog.title': 'Habari na machapisho mapya',

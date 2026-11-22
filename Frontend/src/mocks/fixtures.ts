@@ -50,9 +50,9 @@ export const vehicles: Vehicle[] = [
 ]
 
 const bookingStatuses: BookingStatus[] = [
-  'reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired', 'active',
-  'awaiting_approval', 'approved',
+  'reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired',
   'reserved', 'confirmed', 'checked_out', 'confirmed', 'completed', 'reserved', 'overdue', 'cancelled',
+  'reserved', 'confirmed', 'completed',
   'reserved', 'confirmed',
 ]
 

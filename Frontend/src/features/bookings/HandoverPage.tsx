@@ -8,7 +8,7 @@ import type { Booking, BookingInspection, HandoverRequest, HandoverSettlement } 
 import { Button, ErrorState, Input, Select, Skeleton } from '../../components/ui'
 import { useAuth } from '../../hooks/AuthContext'
 import { formatEat, formatKes } from '../../lib'
-import { compressImage } from '../../lib/image'
+import { compressImage, isAllowedOperationPhoto, MAX_OPERATION_PHOTOS } from '../../lib/image'
 
 type UploadedPhoto = {
   id: string
@@ -59,8 +59,12 @@ export function HandoverPage() {
     setPhotos((current) => current.map((photo) => photo.id === photoId ? { ...photo, status: 'uploading', progress: 0, error: undefined } : photo))
     try {
       const compressed = await compressImage(file)
+      if (!isAllowedOperationPhoto(compressed)) {
+        throw new Error('Photos must be JPG, PNG, or WebP files no larger than 5 MiB after compression.')
+      }
       const body = new FormData()
       body.append('file', compressed)
+      body.append('type', isCheckout ? 'check_out' : 'check_in')
       const result = await apiClient.upload<{ url: string }>(`/bookings/${encodeURIComponent(id)}/inspections/photos`, body, (progress) => {
         setPhotos((current) => current.map((photo) => photo.id === photoId ? { ...photo, progress } : photo))
       })
@@ -69,13 +73,19 @@ export function HandoverPage() {
       setPhotos((current) => current.map((photo) => photo.id === photoId ? {
         ...photo,
         status: 'failed',
-        error: uploadError instanceof ApiError ? uploadError.message : 'Upload failed. Retry this photo.',
+        error: uploadError instanceof ApiError || uploadError instanceof Error ? uploadError.message : 'Upload failed. Retry this photo.',
       } : photo))
     }
   }
 
   function addPhotos(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.currentTarget.files ?? [])
+    event.currentTarget.value = ''
+    if (photos.length + files.length > MAX_OPERATION_PHOTOS) {
+      setError(`Add no more than ${MAX_OPERATION_PHOTOS} photos to an inspection.`)
+      return
+    }
+    setError(null)
     const additions = files.map((file) => ({
       id: `${Date.now()}-${Math.random()}`,
       file,
@@ -83,7 +93,6 @@ export function HandoverPage() {
       progress: 0,
     }))
     setPhotos((current) => [...current, ...additions])
-    event.currentTarget.value = ''
     for (const photo of additions) void uploadPhoto(photo.id, photo.file)
   }
 
@@ -95,7 +104,6 @@ export function HandoverPage() {
       photos: photos.flatMap((photo) => photo.status === 'uploaded' && photo.url ? [photo.url] : []),
       signatureConfirmed,
       criticalDefect,
-      completedAt: new Date().toISOString(),
     }
   }
 
@@ -128,7 +136,6 @@ export function HandoverPage() {
       } else {
         const preview = await apiClient.post<HandoverSettlement>(`/bookings/${encodeURIComponent(id)}/check-in/settlement`, {
           odometer: Number(odometerInput),
-          completedAt: new Date().toISOString(),
         })
         setSettlement(preview)
         setReviewing(true)
@@ -195,7 +202,7 @@ export function HandoverPage() {
           <label className="field"><span className="field__label">Inspection notes</span><textarea className="control handover-notes" maxLength={1000} onChange={(event) => setNotes(event.target.value)} value={notes} /></label>
           <div className="field handover-photo-field">
             <span className="field__label">Photos</span>
-            <label className="handover-photo-picker"><Camera aria-hidden="true" size={18} /><span>Add photos</span><input accept="image/*" capture="environment" multiple onChange={addPhotos} type="file" /></label>
+            <label className="handover-photo-picker"><Camera aria-hidden="true" size={18} /><span>Add photos</span><input accept="image/jpeg,image/png,image/webp" capture="environment" multiple onChange={addPhotos} type="file" /></label>
             {photos.length > 0 && <ul aria-label="Inspection photo uploads" className="handover-upload-list">{photos.map((photo) => <li key={photo.id}>
               <span className="handover-upload-list__name">{photo.file.name}</span>
               {photo.status === 'uploading' && <><progress aria-label={`Uploading ${photo.file.name}`} max={100} value={photo.progress} /><span>{photo.progress}%</span></>}

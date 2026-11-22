@@ -31,7 +31,7 @@ import { t } from '../i18n'
 import { formatKes } from '../lib'
 import { vehicles } from '../mocks/fixtures'
 
-const bookingStatuses = ['pending', 'awaiting_approval', 'approved', 'confirmed', 'active', 'completed', 'cancelled', 'rejected', 'overdue', 'draft'] as const
+const bookingStatuses = ['reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired'] as const
 const vehicleStatuses = ['available', 'booked', 'maintenance', 'inactive'] as const
 
 export function StyleguidePage() {

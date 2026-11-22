@@ -3,16 +3,19 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../api/client'
 import type { Booking, Driver } from '../../api/types'
-import { useAssignDriver, useAvailableDrivers, useBookingDetail, useUpdateBooking } from '../../api/queries'
+import { useApproveOfflinePayment, useAssignDriver, useAvailableDrivers, useBookingDetail, useCancelBooking } from '../../api/queries'
 import { BookingDetailPage } from './BookingDetailPage'
 
 vi.mock('../../api/queries', () => ({
   useAssignDriver: vi.fn(),
   useAvailableDrivers: vi.fn(),
   useBookingDetail: vi.fn(),
-  useUpdateBooking: vi.fn(),
+  useApproveOfflinePayment: vi.fn(),
+  useCancelBooking: vi.fn(),
+  useVehicles: () => ({ data: [] }),
 }))
 vi.mock('../../hooks/useCan', () => ({ useCan: () => true }))
+vi.mock('../../hooks/AuthContext', () => ({ useAuth: () => ({ user: { id: 'usr-owner', role: 'owner' } }) }))
 
 const booking: Booking = {
   id: 'booking-driver-test',
@@ -51,7 +54,8 @@ const assignMutateAsync = vi.fn()
 
 beforeEach(() => {
   vi.mocked(useBookingDetail).mockReturnValue({ data: booking, isLoading: false, isError: false, refetch: vi.fn() } as never)
-  vi.mocked(useUpdateBooking).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useApproveOfflinePayment).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
+  vi.mocked(useCancelBooking).mockReturnValue({ mutateAsync: vi.fn(), isPending: false } as never)
   vi.mocked(useAvailableDrivers).mockReturnValue({ data: { drivers: [validDriver, expiredDriver], autoAssignDriverId: validDriver.id }, isLoading: false, isError: false, refetch: vi.fn() } as never)
   assignMutateAsync.mockReset()
   assignMutateAsync.mockRejectedValue(new ApiError('Unavailable', 409, 'DRIVER_UNAVAILABLE'))

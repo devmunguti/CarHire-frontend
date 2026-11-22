@@ -2,12 +2,17 @@ import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Booking, PaymentMethod } from '../../api/types'
-import { useBookingList, useUpdateBooking, useVehicles } from '../../api/queries'
-import { Button, ConfirmDialog, DataTable, EmptyState, ErrorState, PillTabs, Select, Skeleton, StatusChip } from '../../components/ui'
+import { useBookingList, useCancelBooking, useVehicles } from '../../api/queries'
+import { Button, DataTable, EmptyState, ErrorState, PillTabs, Select, Skeleton, StatusChip } from '../../components/ui'
 import { useCan } from '../../hooks/useCan'
 import { t } from '../../i18n'
-import { formatEat, formatKes } from '../../lib'
+import { formatEat, formatKes, toUtc } from '../../lib'
 import { HoldCountdown } from './HoldCountdown'
+import { formatInTimeZone } from 'date-fns-tz'
+
+function toLocalDateTime(value: string) {
+  return value ? formatInTimeZone(value, 'Africa/Nairobi', "yyyy-MM-dd'T'HH:mm") : ''
+}
 
 const paymentLabels: Record<PaymentMethod, string> = {
   mpesa_online: 'booking.mpesaOnline',
@@ -31,14 +36,13 @@ function BookingActions({ booking }: { booking: Booking }) {
   const canApprove = useCan('approvals:offline')
   const canHandover = useCan('handover:manage')
   const canCreateBookings = useCan('bookings:create')
-  const updateBooking = useUpdateBooking(booking.id)
+  const cancelBooking = useCancelBooking(booking.id)
   const [confirmCancel, setConfirmCancel] = useState(false)
-  const [confirmApprove, setConfirmApprove] = useState(false)
-  const [approvalError, setApprovalError] = useState(false)
+  const [cancelError, setCancelError] = useState(false)
   const actions = [<Link className="button button--ghost button--sm" key="view" to={`/admin/bookings/${booking.id}`}>{t('booking.view')}</Link>]
 
   if (booking.status === 'reserved' && booking.pendingApproval && canApprove) {
-    actions.push(<Button key="approve" onClick={() => { setApprovalError(false); setConfirmApprove(true) }} size="sm" variant="secondary">{t('booking.approve')}</Button>)
+    actions.push(<Link className="button button--secondary button--sm" key="approve" to={`/admin/bookings/${booking.id}`}>{t('booking.approve')}</Link>)
   }
   if (booking.status === 'confirmed' && canHandover) {
     actions.push(<Link className="button button--secondary button--sm" key="checkout" to={`/admin/bookings/${booking.id}/check-out`}>{t('booking.checkOut')}</Link>)
@@ -49,23 +53,10 @@ function BookingActions({ booking }: { booking: Booking }) {
   return (
     <div className="booking-row-actions">
       {actions}
-      {confirmApprove && <ConfirmDialog
-        cancelLabel={t('booking.back')}
-        confirmLabel={t('booking.approveOffline')}
-        description={t('booking.approvalDescription')}
-        onCancel={() => setConfirmApprove(false)}
-        onConfirm={() => {
-          void updateBooking.mutateAsync({ status: 'confirmed', pendingApproval: false })
-            .then(() => setConfirmApprove(false))
-            .catch(() => setApprovalError(true))
-        }}
-        open
-        title={t('booking.approvalTitle')}
-      />}
-      {approvalError && <p role="alert">{t('booking.approvalError')}</p>}
-      {canCreateBookings && ['reserved', 'confirmed'].includes(booking.status) && <>
-        <Button onClick={() => setConfirmCancel(true)} size="sm" variant="ghost">{t('booking.cancel')}</Button>
-        {confirmCancel && <div className="booking-cancel-confirm" role="group"><span>{t('booking.cancelConfirm')}</span><Button onClick={() => void updateBooking.mutateAsync({ status: 'cancelled' }).then(() => setConfirmCancel(false))} size="sm" variant="danger">{t('booking.confirmAction')}</Button><Button onClick={() => setConfirmCancel(false)} size="sm" variant="secondary">{t('booking.back')}</Button></div>}
+      {canCreateBookings && booking.status === 'reserved' && <>
+        <Button onClick={() => { setCancelError(false); setConfirmCancel(true) }} size="sm" variant="ghost">{t('booking.cancel')}</Button>
+        {confirmCancel && <div className="booking-cancel-confirm" role="group"><span>{t('booking.cancelConfirm')}</span><Button disabled={cancelBooking.isPending} onClick={() => void cancelBooking.mutateAsync({ reason: 'Staff cancellation' }).then(() => setConfirmCancel(false)).catch(() => setCancelError(true))} size="sm" variant="danger">{t('booking.confirmAction')}</Button><Button onClick={() => setConfirmCancel(false)} size="sm" variant="secondary">{t('booking.back')}</Button></div>}
+        {cancelError && <p className="field__error" role="alert">{t('booking.actionError')}</p>}
       </>}
     </div>
   )
@@ -84,6 +75,10 @@ export function BookingsListPage() {
     if (value) next.set(key, value)
     else next.delete(key)
     setSearchParams(next)
+  }
+
+  function setDateFilter(key: 'from' | 'to', value: string) {
+    setFilter(key, value ? toUtc(value) : '')
   }
 
   const columns = useMemo(() => [
@@ -110,8 +105,8 @@ export function BookingsListPage() {
         <input aria-label={t('booking.search')} className="control" onChange={(event) => setFilter('search', event.target.value)} placeholder={t('booking.search')} value={searchParams.get('search') ?? ''} />
         <Select label={t('booking.vehicleFilter')} onChange={(event) => setFilter('vehicleId', event.target.value)} options={[{ value: '', label: t('booking.allVehicles') }, ...(vehicleQuery.data ?? []).map((vehicle) => ({ value: vehicle.id, label: `${vehicle.make} ${vehicle.model} (${vehicle.registration})` }))]} value={searchParams.get('vehicleId') ?? ''} />
         <Select label={t('booking.paymentFilter')} onChange={(event) => setFilter('paymentMethod', event.target.value)} options={[{ value: '', label: t('booking.allPayments') }, ...(['mpesa_online', 'mpesa_manual', 'cash', 'bank', 'corporate'] as const).map((method) => ({ value: method, label: t(`booking.${method}`) }))]} value={searchParams.get('paymentMethod') ?? ''} />
-        <input aria-label={t('booking.from')} className="control" onChange={(event) => setFilter('from', event.target.value)} type="datetime-local" value={searchParams.get('from') ?? ''} />
-        <input aria-label={t('booking.to')} className="control" onChange={(event) => setFilter('to', event.target.value)} type="datetime-local" value={searchParams.get('to') ?? ''} />
+        <input aria-label={t('booking.from')} className="control" onChange={(event) => setDateFilter('from', event.target.value)} type="datetime-local" value={toLocalDateTime(searchParams.get('from') ?? '')} />
+        <input aria-label={t('booking.to')} className="control" onChange={(event) => setDateFilter('to', event.target.value)} type="datetime-local" value={toLocalDateTime(searchParams.get('to') ?? '')} />
       </div>
       {bookings.isLoading && <Skeleton rows={5} />}
       {bookings.isError && <ErrorState onRetry={() => void bookings.refetch()} retryLabel={t('styleguide.retry')} title={t('dashboard.metricError')} />}

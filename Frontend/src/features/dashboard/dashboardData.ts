@@ -2,7 +2,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import type { Booking, DashboardData, Incident, SearchResult, Vehicle } from '../../api/types'
 import { bookings as bookingFixtures, customers, incidents as incidentFixtures, vehicles as vehicleFixtures } from '../../mocks/fixtures'
 
-const activeBookingStatuses = new Set(['checked_out', 'overdue', 'active'])
+const activeBookingStatuses = new Set(['checked_out', 'overdue'])
 
 export function buildDashboardData(
   vehicles: Vehicle[] = vehicleFixtures,
@@ -26,6 +26,7 @@ export function buildDashboardData(
 
   const fleetStatus = { available: 0, rented: 0, reserved: 0, maintenance: 0 }
   for (const vehicle of vehicles) {
+    if (vehicle.status === 'inactive') continue
     if (vehicle.status === 'maintenance') fleetStatus.maintenance += 1
     else if (rentedVehicleIds.has(vehicle.id)) fleetStatus.rented += 1
     else if (vehicle.status === 'booked') fleetStatus.reserved += 1

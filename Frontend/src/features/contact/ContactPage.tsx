@@ -2,6 +2,8 @@ import { lazy, Suspense, useState, type FormEvent } from 'react'
 import { Clock3, Mail, MapPin, Phone } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { company, openCompanyEmail } from '../../config/company'
+import { isMockApiEnabled } from '../../api/config'
+import { apiClient } from '../../api/client'
 import { isKenyanPhone, normalisePhone } from '../../lib/phone'
 import { BLOG } from './contactConfig'
 import { t, useTranslation } from '../../i18n'
@@ -13,6 +15,10 @@ type ContactValues = Record<ContactField, string>
 type ContactErrors = Partial<Record<ContactField, string>>
 
 const emptyValues: ContactValues = { name: '', email: '', phone: '', message: '' }
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
+const contactEndpoint = isMockApiEnabled
+  ? '/contact'
+  : `${apiBaseUrl.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '')}/contact`
 
 const infoItems = [
   { label: 'contact.info.address', value: company.address, icon: MapPin },
@@ -52,7 +58,7 @@ function ContactForm() {
 
     setStatus('sending')
     try {
-      const response = await fetch('/contact', {
+      const response = await apiClient.fetchRaw(contactEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...values, name: values.name.trim(), email: values.email.trim(), phone: normalisePhone(values.phone), message: values.message.trim() }),

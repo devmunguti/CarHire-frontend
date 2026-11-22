@@ -7,32 +7,20 @@ const statusColors: Record<BookingStatus, string> = {
   reserved: '#2563eb',
   confirmed: '#0f766e',
   checked_out: '#15803d',
-  expired: '#737373',
-  pending: '#a16207',
-  awaiting_approval: '#c2410c',
-  approved: '#0f766e',
-  active: '#16a34a',
+  overdue: '#b91c1c',
   completed: '#475569',
   cancelled: '#737373',
-  rejected: '#9f1239',
-  overdue: '#b91c1c',
-  draft: '#64748b',
+  expired: '#737373',
 }
 
 const bufferColors: Record<BookingStatus, string> = {
   reserved: '#bfdbfe',
   confirmed: '#99f6e4',
   checked_out: '#bbf7d0',
-  expired: '#e5e5e5',
-  pending: '#fef3c7',
-  awaiting_approval: '#fed7aa',
-  approved: '#99f6e4',
-  active: '#bbf7d0',
+  overdue: '#fecaca',
   completed: '#cbd5e1',
   cancelled: '#e5e5e5',
-  rejected: '#fecdd3',
-  overdue: '#fecaca',
-  draft: '#cbd5e1',
+  expired: '#e5e5e5',
 }
 
 export interface FleetTimelineItem extends TimelineItemBase<number> {

@@ -7,7 +7,7 @@ import { apiClient } from '../../api/client'
 import type { GuestBookingAccess, GuestCheckoutData } from '../../api/types'
 import { maskKenyanPhone } from '../../lib'
 import { GuestBookingPage, GuestCheckoutPage } from './GuestCheckoutPage'
-import { getCheckoutSteps, MAX_LICENCE_SIZE_BYTES, validateLicenceFile } from './checkoutModel'
+import { getCheckoutSteps, guestManageUrl, MAX_LICENCE_SIZE_BYTES, validateLicenceFile } from './checkoutModel'
 
 const checkoutData: GuestCheckoutData = {
   booking: {
@@ -99,9 +99,9 @@ describe('guest checkout', () => {
     expect(await screen.findByRole('heading', { name: 'Terms and rental rules' })).toBeVisible()
   })
 
-  it('does not show booking details for an invalid access token', async () => {
+  it('does not show booking details without an established guest session', async () => {
     vi.spyOn(apiClient, 'get').mockRejectedValue(new Error('not authorized'))
-    renderWithRouter('/booking/BK-TEST-0001?token=invalid', <GuestBookingPage />)
+    renderWithRouter('/booking/BK-TEST-0001', <GuestBookingPage />)
     expect(await screen.findByRole('heading', { name: 'Booking link unavailable' })).toBeVisible()
     expect(screen.queryByText('Toyota Prado TX')).not.toBeInTheDocument()
   })
@@ -118,12 +118,12 @@ describe('guest checkout', () => {
       cancellationAllowed: true,
     }
     vi.spyOn(apiClient, 'get').mockResolvedValue(access)
-    renderWithRouter('/booking/BK-TEST-0001?token=valid-mock-token', <GuestBookingPage />)
+    renderWithRouter('/booking/BK-TEST-0001', <GuestBookingPage />)
     expect(await screen.findByText('2547XX XXX 678')).toBeVisible()
     expect(screen.queryByText('254712345678')).not.toBeInTheDocument()
   })
 
-  it('requires an explicit cancellation confirmation and sends the access token', async () => {
+  it('requires an explicit cancellation confirmation and uses the scoped guest session', async () => {
     const access: GuestBookingAccess = {
       booking: { ...checkoutData.booking, customerPhone: '254712345678' },
       vehicle: { id: 'car-01', make: 'Toyota', model: 'Prado TX', registration: 'KDA 101A' },
@@ -132,17 +132,33 @@ describe('guest checkout', () => {
     }
     vi.spyOn(apiClient, 'get').mockResolvedValue(access)
     const cancelRequest = vi.spyOn(apiClient, 'post').mockResolvedValue({ cancelled: true })
-    renderWithRouter('/booking/BK-TEST-0001?token=valid-mock-token', <GuestBookingPage />)
+    renderWithRouter('/booking/BK-TEST-0001', <GuestBookingPage />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'Cancel booking' }))
     expect(screen.getByText(/Cancellation is free at least 48 hours before pick-up/)).toBeVisible()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
     expect(await screen.findByRole('heading', { name: 'Booking cancelled' })).toBeVisible()
-    expect(cancelRequest).toHaveBeenCalledWith(
-      '/bookings/BK-TEST-0001/cancel',
-      undefined,
-      { headers: { 'X-Booking-Access-Token': 'valid-mock-token' } },
-    )
+    expect(cancelRequest).toHaveBeenCalledWith('/bookings/BK-TEST-0001/cancel')
+  })
+
+  it('explains that a paid guest cancellation refund awaits owner processing', async () => {
+    const access: GuestBookingAccess = {
+      booking: {
+        ...checkoutData.booking,
+        status: 'confirmed',
+        payments: [{ id: 'payment-1', method: 'mpesa_online', amountKes: 25000, status: 'paid', reference: 'receipt-1', createdAt: '2026-11-01T10:00:00.000Z' }],
+      },
+      vehicle: { id: 'car-01', make: 'Toyota', model: 'Prado TX', registration: 'KDA 101A' },
+      accessToken: 'valid-mock-token',
+      cancellationAllowed: true,
+    }
+    vi.spyOn(apiClient, 'get').mockResolvedValue(access)
+    vi.spyOn(apiClient, 'post').mockResolvedValue({ cancelled: true })
+    renderWithRouter('/booking/BK-TEST-0001', <GuestBookingPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel booking' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm cancellation' }))
+    expect(await screen.findByText('Your eligible full refund is awaiting owner review and processing.')).toBeVisible()
   })
 
   it('shows only a masked phone number', () => {
@@ -161,5 +177,9 @@ describe('guest checkout', () => {
 
   it('defines a licence step for self-drive bookings', () => {
     expect(getCheckoutSteps('self_drive')).toEqual(['details', 'licence', 'terms', 'payment'])
+  })
+
+  it('keeps guest access tokens out of booking URLs', () => {
+    expect(guestManageUrl('BK-TEST-0001', true)).toBe('/booking/BK-TEST-0001/confirmation')
   })
 })

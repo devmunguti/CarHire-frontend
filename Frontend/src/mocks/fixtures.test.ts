@@ -12,6 +12,8 @@ describe('development fixtures', () => {
 
   it('provides 20 bookings across all fixture statuses', () => {
     expect(bookings).toHaveLength(20)
-    expect(new Set(bookings.map((booking) => booking.status)).size).toBe(10)
+    expect(new Set(bookings.map((booking) => booking.status))).toEqual(new Set([
+      'reserved', 'confirmed', 'checked_out', 'overdue', 'completed', 'cancelled', 'expired',
+    ]))
   })
 })
