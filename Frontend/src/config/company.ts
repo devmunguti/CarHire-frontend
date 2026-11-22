@@ -1,5 +1,5 @@
 export const company = {
-  name: 'AutoHire KE',
+  name: 'Gari Poa',
   phone: '+254 700 123 456',
   email: 'hello@autohire.ke',
   address: 'Mombasa Road, Nairobi, Kenya',

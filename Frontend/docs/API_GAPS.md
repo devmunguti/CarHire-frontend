@@ -1,6 +1,6 @@
 # Phase 0 API contract and integration gaps
 
-The agreed contract is [Backend/openapi.yaml](../../Backend/openapi.yaml). Phases 1–3 added MongoDB-backed authentication, fleet/availability, and booking lifecycle support. Phase 4 is paused and unverified; Phase 5 has partial backend work and is paused before its completion check. Phase 6 focused backend integration and frontend tests pass; interactive UI flows against the real backend and live SMTP delivery are not yet verified. Keep `VITE_USE_MOCKS` working until each real-API flow is verified.
+The agreed contract is [Backend/openapi.yaml](../../Backend/openapi.yaml). MongoDB-backed authentication, fleet/availability, booking lifecycle, public guest booking and checkout, operations, extensions, administration, and Cloudinary vehicle-image storage are implemented. The full backend test suite passes, and focused frontend tests cover public holds and checkout. Real interactive flows against the deployed API, Atlas migration, Cloudinary credentials, PayHero callbacks, and live SMTP delivery still require environment-specific verification. Keep `VITE_USE_MOCKS` available until each deployed flow is verified.
 
 ## Contract conventions
 
@@ -49,11 +49,15 @@ Every active handler in `Frontend/src/mocks/handlers.ts` maps to one operation b
 | `POST /api/v1/bookings/{id}/check-out` | `checkOutBooking` |
 | `POST /api/v1/bookings/{id}/check-in/settlement` | `previewCheckInSettlement` |
 | `POST /api/v1/bookings/{id}/check-in` | `checkInBooking` |
-| `POST /api/v1/bookings/{id}/payments/stk` | `initiateMpesaStk` |
-| `GET /api/v1/payments/{paymentId}/status` | `getPaymentStatus` |
+| `POST /api/v1/bookings/{ref}/payments/stk` | `initiatePayHeroPayment` |
+| `GET /api/v1/bookings/{ref}/payments/{paymentId}/status` | `getPaymentStatus` |
 | `POST /api/v1/quotes/calculate` | `calculateQuote` |
 | `POST /api/v1/bookings` | `createBooking` |
+| `POST /api/v1/bookings/guest-holds` | `createGuestHold` |
 | `POST /api/v1/bookings/{id}/offline-approval` | `approveOfflinePayment` |
+| `POST /api/v1/bookings/{ref}/extensions` | `requestBookingExtension` |
+| `GET /api/v1/extensions` | `listBookingExtensions` |
+| `POST /api/v1/extensions/{id}/decision` | `reviewBookingExtension` |
 | `GET /api/v1/dashboard` | `getDashboard` |
 | `GET /api/v1/notifications` | `getNotificationCounts` |
 | `GET /api/v1/search` | `searchStaffRecords` |
@@ -74,10 +78,10 @@ Every active handler in `Frontend/src/mocks/handlers.ts` maps to one operation b
 
 ## Additional contract operations without current MSW handlers
 
-These operations are contract-first and now have initial backend implementations; verify them against MongoDB and the frontend before disabling mocks.
+These operations are implemented but still need deployment-specific verification before disabling their corresponding mocks.
 
 - **Authentication and account lifecycle:** profile update, password reset, and invitation acceptance.
-- **Booking and payment:** booking refund records and the M-Pesa provider callback.
+- **Booking and payment:** booking refund records and the PayHero provider callback.
 - **Incident workflow:** incident resolution.
 - **Administration:** pending approvals, staff list/invite/update/resend/revoke, dashboard, notifications, search, and owner-only audit listing.
 
@@ -88,7 +92,8 @@ The admin screens now use API queries/mutations rather than fixture-backed state
 - **401 / 403:** `apiClient` attempts one cookie-based refresh after a protected request returns 401; if that fails, it clears the in-memory access token and dispatches `autohire:unauthorized`, which clears the `AuthContext` user. A normal 403 keeps the session and lets the screen show the permission error; `ACCOUNT_DEACTIVATED` clears the session. `ProtectedRoute` redirects unauthenticated users to `/login` and role mismatches to `/403`. These are UX behaviors only; backend middleware is authoritative.
 - **Timeline:** `TimelinePage.tsx` requests bookings, vehicles, incidents, and maintenance windows. The visible range is built from Nairobi midnight boundaries and sent as UTC instants; the server must filter by interval overlap and return canonical booking/incident states. The page does not send arbitrary sort instructions.
 - **Handover:** `HandoverPage.tsx` uploads each inspection photo separately as multipart (`file`, `type`), asks the server to calculate a check-in settlement, then submits the signed inspection. The server owns inspection timestamps, validates odometer monotonicity and booking state, and moves a critically defective vehicle to maintenance.
-- **Guest checkout:** licence data is part of the checkout multipart request. The one-time access token is exchanged for a scoped HttpOnly cookie and is not placed in a URL. Guest reads/cancellation use that cookie. A hold is not a confirmed booking until online payment or authorized offline approval completes.
+- **Guest booking and checkout:** the public vehicle-details flow creates a 15-minute idempotent hold, then collects checkout details. Licence data is part of the checkout multipart request. The one-time access token is exchanged for a scoped HttpOnly cookie and is not placed in a URL. Guest reads, cancellation, and active-rental extension requests use that cookie. A hold is not a confirmed booking until online payment or authorized offline approval completes.
+- **Extensions:** only checked-out/overdue rentals can request an extension. Staff recheck availability at approval; positive fees require an offline payment method and reference. No automatic charge is initiated.
 - **Fleet status:** `booked` is derived from active bookings; operators may set `available`, `maintenance`, or `inactive`. Vehicles are retained rather than hard-deleted. A vehicle cannot be disabled or put into maintenance while it has an active reservation.
 - **Availability:** date intervals are half-open `[start, end)`. Reads filter overlapping bookings and maintenance windows; booking holds and maintenance writes recheck overlap in a MongoDB transaction. MongoDB must run as a replica set. A stale availability result can still race with another request, so reservation creation is authoritative and returns `VEHICLE_UNAVAILABLE` on conflict.
 - **Reservation lifecycle:** quotes check requested-date availability; creation recalculates the quote and atomically creates a 15-minute hold. Repeated `Idempotency-Key` requests replay the original booking only when the payload matches. Listing/detail lazily mark expired holds as `expired`. Confirmed bookings require the real payment or offline approval transition.
@@ -128,12 +133,12 @@ The confirmed frontend role permissions are mirrored in `x-operation-access`. Ow
 
 | Gap | Needed before |
 | --- | --- |
-| Guest checkout/payments and Phase 5 operational changes are paused and not verified end to end; retain mock mode for those flows. | Before enabling the corresponding real-API flows |
+| Run the frontend against the deployed backend and verify the booking, checkout, handover, extension, and administration flows with real data. | Before disabling mocks in a deployment |
 | Production and local MongoDB must support transactions; configure MongoDB as a replica set. | Before running fleet/availability APIs |
-| Confirm the M-Pesa provider, callback schema/signature mechanism, credentials/secrets delivery, retry semantics, and refund API. The webhook contract is normalized, not provider-certified. | Payment integration |
+| Configure PayHero credentials and a public HTTPS callback, then verify provider status lookup, retries, and refunds. The callback contract is not live-provider certified. | Payment integration |
 | Branch-level isolation is deferred; the application is being operated as a single branch. Do not treat the staff branch label as an authorization boundary. | Before multi-branch production data |
 | Configure real SMTP credentials and `CONTACT_INBOX`; rate limiting is five requests per 15 minutes per client IP. Contact submissions are not persisted. | Before enabling public contact delivery |
-| Verify staff, profile, approvals, audit, dashboard, notifications, and search through the frontend against the real backend; validate contact delivery with configured SMTP. | Before Phase 6 production rollout |
+| Verify staff, profile, approvals, audit, dashboard, notifications, and search through the frontend against the deployed backend; validate contact delivery with configured SMTP. | Before production rollout |
 | Verify every contract operation against the real backend before disabling its corresponding mock. | Production cutover |
 
 ## Server invariants

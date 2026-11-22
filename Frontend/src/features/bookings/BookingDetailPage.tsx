@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useApproveOfflinePayment, useAssignDriver, useAvailableDrivers, useBookingDetail, useCancelBooking, useVehicles } from '../../api/queries'
 import { ApiError } from '../../api/client'
-import { isMockApiEnabled } from '../../api/config'
 import type { BookingStatus } from '../../api/types'
 import { Button, Checkbox, DataTable, EmptyState, ErrorState, Input, Modal, Select, Skeleton, StatusChip } from '../../components/ui'
 import { useCan } from '../../hooks/useCan'
@@ -120,9 +119,7 @@ export function BookingDetailPage() {
       </Modal>}
 
       {booking.status === 'reserved' && booking.paymentMethod === 'mpesa_online' && <section className="booking-detail-payment">
-        {isMockApiEnabled
-          ? <PaymentStatus amountDueKes={booking.totalKes} bookingId={booking.id} bookingReference={booking.reference} initialPhone={booking.customerPhone} onConfirmed={() => void bookingQuery.refetch()} />
-          : <p role="status">Online payment processing is not enabled yet. This hold will expire automatically; create a new booking using an offline payment method.</p>}
+        <PaymentStatus amountDueKes={booking.totalKes} bookingId={booking.id} bookingReference={booking.reference} initialPhone={booking.customerPhone} onConfirmed={() => void bookingQuery.refetch()} />
       </section>}
 
       <div className="booking-detail-grid">

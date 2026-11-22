@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { CalendarPlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { CalendarPlus, CarFront, ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 import {
   useCreateMaintenanceWindow,
   useCreateVehicle,
@@ -7,6 +7,7 @@ import {
   useMaintenanceWindows,
   useUpdateMaintenanceWindow,
   useUpdateVehicle,
+  useUploadVehicleImage,
   useVehicles,
 } from '../../api/queries'
 import { ApiError } from '../../api/client'
@@ -50,6 +51,20 @@ const blankVehicle: VehicleForm = {
   status: 'available',
 }
 
+function vehicleFormFrom(vehicle: Vehicle): VehicleForm {
+  return {
+    make: vehicle.make,
+    model: vehicle.model,
+    category: vehicle.category ?? '',
+    year: String(vehicle.year),
+    registration: vehicle.registration,
+    seats: String(vehicle.seats),
+    transmission: vehicle.transmission,
+    ratePerDay: String(vehicle.ratePerDay),
+    status: vehicle.status === 'booked' ? 'available' : vehicle.status,
+  }
+}
+
 function errorMessage(error: unknown) {
   if (error instanceof ApiError) return error.message
   return 'The request could not be completed. Please try again.'
@@ -69,11 +84,15 @@ export function FleetPage() {
   const maintenanceQuery = useMaintenanceWindows(range.startUtc, range.endUtc)
   const createVehicle = useCreateVehicle()
   const updateVehicle = useUpdateVehicle()
+  const uploadVehicleImage = useUploadVehicleImage()
   const createWindow = useCreateMaintenanceWindow()
   const updateWindow = useUpdateMaintenanceWindow()
   const deleteWindow = useDeleteMaintenanceWindow()
   const [vehicleDialog, setVehicleDialog] = useState<Vehicle | 'new' | null>(null)
   const [vehicleForm, setVehicleForm] = useState<VehicleForm>(blankVehicle)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null)
+  const imagePreviewUrlRef = useRef<string | null>(null)
   const [windowDialog, setWindowDialog] = useState<MaintenanceWindow | 'new' | null>(null)
   const [windowForm, setWindowForm] = useState<MaintenanceForm>({
     vehicleId: '',
@@ -88,24 +107,29 @@ export function FleetPage() {
   const vehicles = vehiclesQuery.data ?? []
   const windows = maintenanceQuery.data ?? []
 
+  useEffect(() => {
+    return () => {
+      if (imagePreviewUrlRef.current) URL.revokeObjectURL(imagePreviewUrlRef.current)
+    }
+  }, [])
+
+  function clearImageSelection() {
+    if (imagePreviewUrlRef.current) URL.revokeObjectURL(imagePreviewUrlRef.current)
+    imagePreviewUrlRef.current = null
+    setImageFile(null)
+    setImagePreviewUrl(null)
+  }
+
   function openVehicle(vehicle: Vehicle | 'new') {
     setVehicleDialog(vehicle)
-    setVehicleForm(vehicle === 'new' ? blankVehicle : {
-      make: vehicle.make,
-      model: vehicle.model,
-      category: vehicle.category ?? '',
-      year: String(vehicle.year),
-      registration: vehicle.registration,
-      seats: String(vehicle.seats),
-      transmission: vehicle.transmission,
-      ratePerDay: String(vehicle.ratePerDay),
-      status: vehicle.status === 'booked' ? 'available' : vehicle.status,
-    })
+    setVehicleForm(vehicle === 'new' ? blankVehicle : vehicleFormFrom(vehicle))
+    clearImageSelection()
     setFormError(null)
   }
 
   function closeVehicle() {
     setVehicleDialog(null)
+    clearImageSelection()
     setFormError(null)
   }
 
@@ -129,17 +153,26 @@ export function FleetPage() {
       return
     }
     setFormError(null)
+    let createdVehicle = false
     try {
+      let savedVehicle: Vehicle
       if (vehicleDialog === 'new') {
-        await createVehicle.mutateAsync(request)
-        setToast('Vehicle added to the fleet.')
+        savedVehicle = await createVehicle.mutateAsync(request)
+        createdVehicle = true
+        setVehicleDialog(savedVehicle)
+        setVehicleForm(vehicleFormFrom(savedVehicle))
       } else if (vehicleDialog) {
-        await updateVehicle.mutateAsync({ id: vehicleDialog.id, request })
-        setToast('Vehicle details updated.')
+        savedVehicle = await updateVehicle.mutateAsync({ id: vehicleDialog.id, request })
+      } else {
+        return
       }
+      if (imageFile) await uploadVehicleImage.mutateAsync({ id: savedVehicle.id, file: imageFile })
+      setToast(vehicleDialog === 'new' ? 'Vehicle added to the fleet.' : 'Vehicle details updated.')
       closeVehicle()
     } catch (error) {
-      setFormError(errorMessage(error))
+      setFormError(createdVehicle
+        ? `Vehicle saved, but its image could not be uploaded: ${errorMessage(error)} Select Save again to retry the image upload.`
+        : errorMessage(error))
     }
   }
 
@@ -218,6 +251,7 @@ export function FleetPage() {
   }
 
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]))
+  const currentImageUrl = vehicleDialog && vehicleDialog !== 'new' ? vehicleDialog.imageUrl : undefined
 
   return (
     <section className="fleet-management-page">
@@ -230,6 +264,9 @@ export function FleetPage() {
         <header className="fleet-management-panel__header"><div><h3>Vehicles</h3><span>{vehicles.length} vehicles</span></div></header>
         <DataTable
           columns={[
+            { key: 'image', header: 'Image', render: (vehicle: Vehicle) => vehicle.imageUrl
+              ? <img alt={`${vehicle.make} ${vehicle.model}`} className="fleet-vehicle-image" src={vehicle.imageUrl} />
+              : <span aria-label="No vehicle image" className="fleet-vehicle-image fleet-vehicle-image--empty"><CarFront aria-hidden="true" size={20} /></span> },
             { key: 'vehicle', header: 'Vehicle', render: (vehicle: Vehicle) => <span className="fleet-vehicle-name"><strong>{vehicle.make} {vehicle.model}</strong><small>{vehicle.year}{vehicle.category ? ` · ${vehicle.category}` : ''}</small></span> },
             { key: 'registration', header: 'Registration', render: (vehicle: Vehicle) => vehicle.registration },
             { key: 'specs', header: 'Capacity', render: (vehicle: Vehicle) => `${vehicle.seats} seats · ${vehicle.transmission}` },
@@ -289,6 +326,34 @@ export function FleetPage() {
           <Input label="Seats" max={100} min={1} onChange={(event) => setVehicleForm({ ...vehicleForm, seats: event.target.value })} required type="number" value={vehicleForm.seats} />
           <Select label="Transmission" onChange={(event) => setVehicleForm({ ...vehicleForm, transmission: event.target.value as Vehicle['transmission'] })} options={[{ value: 'automatic', label: 'Automatic' }, { value: 'manual', label: 'Manual' }]} value={vehicleForm.transmission} />
           <Input label="Daily rate (KES)" min={0} onChange={(event) => setVehicleForm({ ...vehicleForm, ratePerDay: event.target.value })} required type="number" value={vehicleForm.ratePerDay} />
+          <label className="field">
+            <span className="field__label">Vehicle image</span>
+            <span className="fleet-image-picker">
+              <ImagePlus aria-hidden="true" size={18} />
+              <span>{imageFile?.name ?? (currentImageUrl ? 'Choose a replacement image' : 'Choose an image')}</span>
+              <input accept="image/jpeg,image/png,image/webp" aria-label="Vehicle image" onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (!file) return
+                if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 5 * 1024 * 1024) {
+                  clearImageSelection()
+                  setFormError('Choose a JPEG, PNG, or WebP image up to 5 MiB.')
+                  event.target.value = ''
+                  return
+                }
+                setFormError(null)
+                if (imagePreviewUrlRef.current) URL.revokeObjectURL(imagePreviewUrlRef.current)
+                imagePreviewUrlRef.current = URL.createObjectURL(file)
+                setImagePreviewUrl(imagePreviewUrlRef.current)
+                setImageFile(file)
+              }} type="file" />
+            </span>
+            <span className="field__hint">JPEG, PNG, or WebP; maximum 5 MiB. Images are stored on Cloudinary.</span>
+          </label>
+          {(imagePreviewUrl || currentImageUrl) && <img
+            alt="Vehicle image preview"
+            className="fleet-image-preview"
+            src={imagePreviewUrl ?? currentImageUrl}
+          />}
           <Select label="Status" onChange={(event) => setVehicleForm({ ...vehicleForm, status: event.target.value as VehicleManagementStatus })} options={[
             { value: 'available', label: 'Available' },
             { value: 'maintenance', label: 'Maintenance' },
@@ -298,7 +363,7 @@ export function FleetPage() {
           {formError && <p className="field__error" role="alert">{formError}</p>}
           <div className="fleet-form__actions">
             <Button onClick={closeVehicle} variant="secondary"><X size={16} />Cancel</Button>
-            <Button disabled={createVehicle.isPending || updateVehicle.isPending} type="submit">{createVehicle.isPending || updateVehicle.isPending ? 'Saving…' : 'Save vehicle'}</Button>
+            <Button disabled={createVehicle.isPending || updateVehicle.isPending || uploadVehicleImage.isPending} type="submit">{createVehicle.isPending || updateVehicle.isPending || uploadVehicleImage.isPending ? 'Saving…' : 'Save vehicle'}</Button>
           </div>
         </form>
       </Modal>

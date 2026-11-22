@@ -130,7 +130,7 @@ export function DashboardView({
         <DashboardPanel icon={<CarFront size={18} />} title={t('dashboard.fleetStatus')}>
           {data ? <FleetStatus data={data.fleetStatus} /> : <div className="dashboard-panel__skeleton" />}
         </DashboardPanel>
-        <DashboardPanel href="/admin/bookings?sort=updatedAt" icon={<ActivityIcon />} title={t('dashboard.recentActivity')}>
+        <DashboardPanel href="/admin/bookings?sort=createdAt:desc" icon={<ActivityIcon />} title={t('dashboard.recentActivity')}>
           {data?.recentActivity.length ? (
             <ol className="activity-feed">
               {data.recentActivity.map((activity) => (

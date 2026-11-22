@@ -73,7 +73,7 @@ export function AboutPage() {
     </section>
 
     {APP_PROMO && <section aria-labelledby="about-app-title" className="about-app story-width">
-      <div><p className="eyebrow">AutoHire KE</p><h2 id="about-app-title">{t('about.app.title')}</h2><p>{t('about.app.copy')}</p><div className="about-app__badges"><a href="#app-store">{t('footer.appStore')}</a><a href="#google-play">{t('footer.googlePlay')}</a></div></div>
+      <div><p className="eyebrow">Gari Poa</p><h2 id="about-app-title">{t('about.app.title')}</h2><p>{t('about.app.copy')}</p><div className="about-app__badges"><a href="#app-store">{t('footer.appStore')}</a><a href="#google-play">{t('footer.googlePlay')}</a></div></div>
       <div aria-label={t('about.image.app')} className="about-app__phone" role="img" />
     </section>}
 

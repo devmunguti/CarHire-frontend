@@ -1,12 +1,16 @@
 export { ApiError, apiClient, getAccessToken, setAccessToken } from './client'
 export { getCurrentUser, login, logout } from './auth'
-export { useApproveOfflinePayment, useAssignDriver, useAvailableDrivers, useAvailableVehicles, useBookingDetail, useBookingList, useBookings, useCalculateQuote, useCancelBooking, useCreateBooking, useCreateIncident, useCreateMaintenanceWindow, useCreateMechanic, useCreateVehicle, useDashboard, useDeleteMaintenanceWindow, useDispatchIncident, useDrivers, useGlobalSearch, useHealth, useIncidents, useMaintenanceWindows, useMechanics, useMyDriverTrips, useNearestMechanics, useShellNotifications, useUpdateDriverTripStatus, useUpdateMaintenanceWindow, useUpdateVehicle, useVehicles } from './queries'
+export { useApproveOfflinePayment, useAssignDriver, useAvailableDrivers, useAvailableVehicles, useBookingDetail, useBookingExtensions, useBookingList, useBookings, useCalculateQuote, useCancelBooking, useCreateBooking, useCreateGuestHold, useCreateIncident, useCreateMaintenanceWindow, useCreateMechanic, useCreateVehicle, useDashboard, useDeleteMaintenanceWindow, useDispatchIncident, useDrivers, useGlobalSearch, useHealth, useIncidents, useMaintenanceWindows, useMechanics, useMyDriverTrips, useNearestMechanics, useRequestGuestExtension, useReviewBookingExtension, useShellNotifications, useUpdateDriverTripStatus, useUpdateMaintenanceWindow, useUpdateVehicle, useUploadVehicleImage, useVehicle, useVehicles } from './queries'
 export type {
   ApiErrorEnvelope,
   ApiEnvelope,
   AuthSession,
   Booking,
   BookingCancellationRequest,
+  BookingExtension,
+  BookingExtensionDecisionRequest,
+  GuestHoldRequest,
+  GuestHoldResponse,
   BookingStatus,
   HealthStatus,
   DashboardData,

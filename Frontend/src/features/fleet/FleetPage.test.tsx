@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   deleteMaintenance: vi.fn(),
   updateMaintenance: vi.fn(),
   updateVehicle: vi.fn(),
+  uploadVehicleImage: vi.fn(),
 }))
 
 vi.mock('../../hooks/AuthContext', () => ({
@@ -20,6 +21,7 @@ vi.mock('../../api/queries', () => ({
   useMaintenanceWindows: () => ({ data: [windowFixture], isLoading: false, isError: false, refetch: vi.fn() }),
   useCreateVehicle: () => ({ mutateAsync: mocks.createVehicle, isPending: false }),
   useUpdateVehicle: () => ({ mutateAsync: mocks.updateVehicle, isPending: false }),
+  useUploadVehicleImage: () => ({ mutateAsync: mocks.uploadVehicleImage, isPending: false }),
   useCreateMaintenanceWindow: () => ({ mutateAsync: mocks.createMaintenance, isPending: false }),
   useUpdateMaintenanceWindow: () => ({ mutateAsync: mocks.updateMaintenance, isPending: false }),
   useDeleteMaintenanceWindow: () => ({ mutateAsync: mocks.deleteMaintenance, isPending: false }),
@@ -55,6 +57,7 @@ describe('FleetPage', () => {
     vi.clearAllMocks()
     mocks.createVehicle.mockResolvedValue(vehicle)
     mocks.updateVehicle.mockResolvedValue(vehicle)
+    mocks.uploadVehicleImage.mockResolvedValue(vehicle)
     mocks.createMaintenance.mockResolvedValue(windowFixture)
     mocks.updateMaintenance.mockResolvedValue(windowFixture)
     mocks.deleteMaintenance.mockResolvedValue({ deleted: true })
@@ -96,6 +99,21 @@ describe('FleetPage', () => {
       id: vehicle.id,
       request: { status: 'maintenance' },
     }))
+  })
+
+  it('uploads a selected image for the vehicle and refreshes the fleet record', async () => {
+    render(<FleetPage />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit KDA 101A' }))
+    const image = new File([new Uint8Array([1, 2, 3])], 'prado.webp', { type: 'image/webp' })
+    fireEvent.change(screen.getByLabelText('Vehicle image'), { target: { files: [image] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save vehicle' }))
+
+    await waitFor(() => expect(mocks.uploadVehicleImage).toHaveBeenCalledWith({
+      id: vehicle.id,
+      file: image,
+    }))
+    expect(await screen.findByText('Vehicle details updated.')).toBeVisible()
   })
 
   it('creates a maintenance window through the API mutation', async () => {

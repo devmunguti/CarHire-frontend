@@ -131,6 +131,7 @@ export function PaymentStatus({
         <h3>Check your phone</h3>
         <p>Approve the M-Pesa request sent to <strong>{maskedPhone}</strong>.</p>
         <p className="payment-status__countdown">Checking for payment: {Math.floor(secondsRemaining / 60)}:{String(secondsRemaining % 60).padStart(2, '0')}</p>
+        {error && <p className="field__error" role="alert">{error}</p>}
       </div>}
       {paymentState === 'confirmed' && <div className="payment-status__state">
         <CheckCircle2 aria-hidden="true" size={24} />

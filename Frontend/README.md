@@ -1,6 +1,6 @@
-# AutoHire KE frontend
+# Gari Poa frontend
 
-React, TypeScript, and Vite frontend for the AutoHire KE vehicle-rental pilot.
+React, TypeScript, and Vite frontend for the Gari Poa vehicle-rental service.
 
 ## Requirements
 

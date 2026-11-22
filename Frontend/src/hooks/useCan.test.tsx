@@ -52,10 +52,11 @@ describe('useCan documented section 5 matrix', () => {
     for (const role of roles) {
       vi.mocked(getCurrentUser).mockResolvedValue(makeUser(role))
       render(<AuthProvider><PermissionMatrix /></AuthProvider>)
-      await waitFor(() => expect(screen.getByTestId('dashboard:view')).not.toBeEmptyDOMElement())
-      for (const [permission, allowedRoles] of matrix) {
-        expect(screen.getByTestId(permission)).toHaveTextContent(String(allowedRoles.includes(role)))
-      }
+      await waitFor(() => {
+        for (const [permission, allowedRoles] of matrix) {
+          expect(screen.getByTestId(permission)).toHaveTextContent(String(allowedRoles.includes(role)))
+        }
+      })
       cleanup()
     }
   })

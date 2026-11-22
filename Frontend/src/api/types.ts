@@ -214,6 +214,7 @@ export interface Vehicle {
   id: string
   make: string
   model: string
+  imageUrl?: string
   category?: string
   year: number
   registration: string
@@ -225,7 +226,7 @@ export interface Vehicle {
 
 export type VehicleManagementStatus = Exclude<VehicleStatus, 'booked'>
 
-export type VehicleCreateRequest = Omit<Vehicle, 'id' | 'status'> & {
+export type VehicleCreateRequest = Omit<Vehicle, 'id' | 'status' | 'imageUrl'> & {
   status?: VehicleManagementStatus
 }
 
@@ -290,13 +291,51 @@ export interface Booking {
 
 export interface GuestCheckoutData {
   booking: Pick<Booking, 'id' | 'reference' | 'vehicleId' | 'status' | 'pendingApproval' | 'pickupAt' | 'returnAt' | 'totalKes' | 'mode' | 'paymentMethod' | 'holdExpiresAt' | 'pricingSnapshot'>
-  vehicle: Pick<Vehicle, 'id' | 'make' | 'model' | 'registration' | 'ratePerDay'>
+  vehicle: Pick<Vehicle, 'id' | 'make' | 'model' | 'registration' | 'ratePerDay' | 'imageUrl'>
+}
+
+export type GuestHoldRequest = QuoteRequest
+
+export interface GuestHoldResponse {
+  bookingId: string
+  holdExpiresAt: string
+}
+
+export interface BookingExtension {
+  id: string
+  reference: string
+  currentReturnAt: string
+  requestedReturnAt: string
+  reason: string
+  status: 'pending' | 'approved' | 'declined'
+  feeKes?: number
+  paymentReference?: string
+  paymentMethod?: 'cash' | 'mpesa_manual' | 'bank'
+  reviewNote?: string
+  createdAt: string
+  reviewedAt?: string
+  booking?: {
+    id: string
+    reference: string
+    customerName: string
+    vehicle: string
+    currentReturnAt: string
+    status: BookingStatus
+  }
+}
+
+export interface BookingExtensionDecisionRequest {
+  decision: 'approve' | 'decline'
+  paymentMethod?: 'cash' | 'mpesa_manual' | 'bank'
+  paymentReference?: string
+  reviewNote?: string
 }
 
 export interface GuestBookingSummary {
   booking: Pick<Booking, 'id' | 'reference' | 'vehicleId' | 'customerName' | 'customerPhone' | 'status' | 'pendingApproval' | 'pickupAt' | 'returnAt' | 'totalKes' | 'mode' | 'paymentMethod' | 'pricingSnapshot' | 'payments'>
-  vehicle: Pick<Vehicle, 'id' | 'make' | 'model' | 'registration'>
+  vehicle: Pick<Vehicle, 'id' | 'make' | 'model' | 'registration' | 'imageUrl'>
   cancellationAllowed: boolean
+  extensionRequest?: Pick<BookingExtension, 'currentReturnAt' | 'requestedReturnAt' | 'reason' | 'feeKes' | 'status'>
 }
 
 export interface GuestBookingAccess extends GuestBookingSummary {
@@ -391,6 +430,7 @@ export interface NearbyMechanic extends Mechanic {
 export interface NotificationCounts {
   pendingApprovals: number
   openIncidents: number
+  pendingExtensions: number
 }
 
 export interface SearchResult {

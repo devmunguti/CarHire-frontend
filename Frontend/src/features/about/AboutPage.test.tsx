@@ -50,7 +50,7 @@ describe('about page questions', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Our story' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
-    expect(screen.getByTitle('AutoHire KE story video')).toHaveAttribute('src', 'https://example.test/story')
+    expect(screen.getByTitle('Gari Poa story video')).toHaveAttribute('src', 'https://example.test/story')
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })

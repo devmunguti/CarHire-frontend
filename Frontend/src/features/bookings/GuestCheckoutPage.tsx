@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, ShieldCheck } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ApiError, apiClient } from '../../api/client'
+import { useRequestGuestExtension } from '../../api/queries'
 import type { GuestCheckoutData, GuestBookingAccess, GuestBookingSummary } from '../../api/types'
 import { Button, Checkbox, Input, PhoneInput, Skeleton } from '../../components/ui'
 import { HoldCountdown } from './HoldCountdown'
@@ -33,6 +34,7 @@ function CheckoutPriceSummary({ data }: { data: GuestCheckoutData }) {
   const { booking, vehicle } = data
   return <aside aria-label="Price summary" className="guest-price-summary">
     <h2>Price summary</h2>
+    {vehicle.imageUrl && <img alt={`${vehicle.make} ${vehicle.model}`} className="guest-price-summary__vehicle-image" src={vehicle.imageUrl} />}
     <p className="guest-price-summary__vehicle">{vehicle.make} {vehicle.model}<small>{vehicle.registration}</small></p>
     <dl>
       <div><dt>Pick-up</dt><dd>{formatEat(booking.pickupAt)}</dd></div>
@@ -231,6 +233,12 @@ function GuestBookingDetails({ access, onCancelled }: { access: GuestBookingSumm
   const [cancelError, setCancelError] = useState<string | null>(null)
   const [cancelled, setCancelled] = useState(booking.status === 'cancelled')
   const [isCancelling, setIsCancelling] = useState(false)
+  const [extensionDate, setExtensionDate] = useState('')
+  const [extensionReason, setExtensionReason] = useState('')
+  const [extensionMessage, setExtensionMessage] = useState<string | null>(null)
+  const [extensionError, setExtensionError] = useState<string | null>(null)
+  const extensionMutation = useRequestGuestExtension(booking.reference)
+  const canRequestExtension = !cancelled && ['checked_out', 'overdue'].includes(booking.status)
   const canCancel = !cancelled && access.cancellationAllowed && !['completed', 'cancelled'].includes(booking.status)
   const paidKes = (booking.payments ?? []).filter((payment) => payment.status === 'paid').reduce((total, payment) => total + payment.amountKes, 0)
 
@@ -246,6 +254,28 @@ function GuestBookingDetails({ access, onCancelled }: { access: GuestBookingSumm
       setCancelError('We could not cancel this booking. Please contact our team.')
     } finally {
       setIsCancelling(false)
+    }
+  }
+
+  async function submitExtension(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setExtensionMessage(null)
+    setExtensionError(null)
+    const requestedReturnAt = new Date(extensionDate)
+    if (!extensionDate || !Number.isFinite(requestedReturnAt.getTime()) || requestedReturnAt <= new Date(booking.returnAt)) {
+      setExtensionError('Choose a return time later than the current booking return time.')
+      return
+    }
+    try {
+      await extensionMutation.mutateAsync({
+        requestedReturnAt: requestedReturnAt.toISOString(),
+        reason: extensionReason.trim(),
+      })
+      setExtensionDate('')
+      setExtensionReason('')
+      setExtensionMessage('Your request was sent. Our team will check availability and contact you about the next steps.')
+    } catch (requestError) {
+      setExtensionError(requestError instanceof ApiError ? requestError.message : 'We could not submit your extension request.')
     }
   }
 
@@ -271,10 +301,22 @@ function GuestBookingDetails({ access, onCancelled }: { access: GuestBookingSumm
     {cancelError && <p className="guest-checkout-error" role="alert">{cancelError}</p>}
     <div className="guest-booking-actions">
       {canCancel && !cancelPrompt && <Button onClick={() => setCancelPrompt(true)} variant="danger">Cancel booking</Button>}
-      <Button disabled title="Extension requests are planned for a future release." variant="secondary">Request an extension (coming in v2)</Button>
     </div>
+    {canRequestExtension && <section aria-labelledby="guest-extension-title" className="guest-extension-panel">
+      <h2 id="guest-extension-title">Need more time?</h2>
+      {access.extensionRequest
+        ? <p role="status">Your extension request for {formatEat(access.extensionRequest.requestedReturnAt)} is awaiting staff review. Estimated additional charge: {formatKes(access.extensionRequest.feeKes ?? 0)}. This is not approved yet.</p>
+        : <form className="stack stack--md" onSubmit={(event) => void submitExtension(event)}>
+          <Input label="Requested new return date and time" min={new Date(booking.returnAt).toISOString().slice(0, 16)} onChange={(event) => setExtensionDate(event.target.value)} required type="datetime-local" value={extensionDate} />
+          <label className="field"><span className="field__label">Reason</span><textarea className="control" maxLength={1000} onChange={(event) => setExtensionReason(event.target.value)} required value={extensionReason} /></label>
+          <p>Submitting a request does not change your booking. Staff will check availability and confirm any additional offline payment before approving it.</p>
+          {extensionError && <p className="field__error" role="alert">{extensionError}</p>}
+          {extensionMessage && <p role="status">{extensionMessage}</p>}
+          <Button disabled={extensionMutation.isPending} type="submit">{extensionMutation.isPending ? 'Sending…' : 'Request extension'}</Button>
+        </form>}
+    </section>}
     <section aria-label="Pickup instructions" className="guest-pickup-instructions"><h2>Pickup instructions</h2><p>Please bring your original driving licence and National ID or passport. Our team will confirm your pickup details before your trip.</p></section>
-    <Link className="guest-booking-back" to="/">Return to AutoHire KE</Link>
+    <Link className="guest-booking-back" to="/">Return to Gari Poa</Link>
   </section>
 }
 
@@ -292,7 +334,7 @@ export function GuestBookingPage({ confirmation = false }: { confirmation?: bool
   if (!ref) return <GuestAccessError />
   if (guestQuery.isLoading) return <div aria-label="Loading booking" className="guest-checkout-loading" role="status"><Skeleton rows={4} /></div>
   if (guestQuery.isError || !guestQuery.data) return <GuestAccessError />
-  if (cancelled) return <section className="guest-checkout-message"><h1>Booking cancelled</h1><p>{refundPending ? 'Your eligible full refund is awaiting owner review and processing.' : 'Your cancellation request was processed.'}</p><Link className="button button--secondary" to="/">Return to AutoHire KE</Link></section>
+  if (cancelled) return <section className="guest-checkout-message"><h1>Booking cancelled</h1><p>{refundPending ? 'Your eligible full refund is awaiting owner review and processing.' : 'Your cancellation request was processed.'}</p><Link className="button button--secondary" to="/">Return to Gari Poa</Link></section>
 
   const access = guestQuery.data
   const { booking } = access

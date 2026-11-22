@@ -67,7 +67,7 @@ export function LoginPage() {
         <div className="login-brand-panel__content">
           <Link aria-label={t('admin.brand')} className="brand brand--login" to="/">
             <span className="brand__mark"><span className="brand__mark-inner"><Check aria-hidden="true" size={22} /></span></span>
-            <span className="brand__name">AutoHire <b>KE</b></span>
+            <span className="brand__name">Gari Poa</span>
           </Link>
           <div className="login-brand-panel__copy">
             <p className="login-eyebrow">{t('auth.staffPortal')}</p>

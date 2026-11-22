@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useRef } from 'react'
 import { apiClient } from './client'
-import type { AuditEntry, AuditQuery, AvailableDriversResponse, Booking, BookingCancellationRequest, BookingCreateRequest, DashboardData, Driver, DriverTripStatus, HealthStatus, Incident, IncidentCreateRequest, IncidentDispatchType, MaintenanceWindow, MaintenanceWindowCreateRequest, MaintenanceWindowUpdateRequest, Mechanic, MechanicCreateRequest, NearbyMechanic, NotificationCounts, OfflineApprovalRequest, QuoteRequest, QuoteResponse, SearchResult, StaffInvitation, StaffInvitationRequest, StaffMember, StaffUpdateRequest, Vehicle, VehicleCreateRequest, VehicleUpdateRequest } from './types'
+import type { AuditEntry, AuditQuery, AvailableDriversResponse, Booking, BookingCancellationRequest, BookingCreateRequest, BookingExtension, BookingExtensionDecisionRequest, DashboardData, Driver, DriverTripStatus, GuestHoldRequest, GuestHoldResponse, HealthStatus, Incident, IncidentCreateRequest, IncidentDispatchType, MaintenanceWindow, MaintenanceWindowCreateRequest, MaintenanceWindowUpdateRequest, Mechanic, MechanicCreateRequest, NearbyMechanic, NotificationCounts, OfflineApprovalRequest, QuoteRequest, QuoteResponse, SearchResult, StaffInvitation, StaffInvitationRequest, StaffMember, StaffUpdateRequest, Vehicle, VehicleCreateRequest, VehicleUpdateRequest } from './types'
 
 export function useHealth() {
   return useQuery({ queryKey: ['health'], queryFn: () => apiClient.get<HealthStatus>('/health') })
@@ -9,6 +9,14 @@ export function useHealth() {
 
 export function useVehicles() {
   return useQuery({ queryKey: ['vehicles'], queryFn: () => apiClient.getAll<Vehicle>('/vehicles') })
+}
+
+export function useVehicle(id: string) {
+  return useQuery({
+    queryKey: ['vehicle', id],
+    queryFn: () => apiClient.get<Vehicle>(`/vehicles/${encodeURIComponent(id)}`),
+    enabled: Boolean(id),
+  })
 }
 
 export function useMaintenanceWindows(from: string, to: string) {
@@ -40,6 +48,18 @@ export function useUpdateVehicle() {
   return useMutation({
     mutationFn: ({ id, request }: { id: string; request: VehicleUpdateRequest }) => apiClient.patch<Vehicle>(`/vehicles/${encodeURIComponent(id)}`, request),
     onSuccess: () => invalidateFleetQueries(queryClient),
+  })
+}
+
+export function useUploadVehicleImage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, file }: { id: string; file: File }) => {
+      const body = new FormData()
+      body.append('image', file)
+      return apiClient.upload<Vehicle>(`/vehicles/${encodeURIComponent(id)}/image`, body, () => undefined)
+    },
+    onSuccess: async () => invalidateFleetQueries(queryClient),
   })
 }
 
@@ -115,6 +135,54 @@ export function useCreateBooking() {
         queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
       ])
     },
+  })
+}
+
+export function useCreateGuestHold() {
+  const pendingRequest = useRef<{ fingerprint: string; key: string } | null>(null)
+  return useMutation({
+    mutationFn: (request: GuestHoldRequest) => {
+      const fingerprint = JSON.stringify(request)
+      if (pendingRequest.current?.fingerprint !== fingerprint) {
+        pendingRequest.current = { fingerprint, key: crypto.randomUUID() }
+      }
+      return apiClient.post<GuestHoldResponse>('/bookings/guest-holds', request, {
+        headers: { 'Idempotency-Key': pendingRequest.current.key },
+      })
+    },
+    onSuccess: () => {
+      pendingRequest.current = null
+    },
+  })
+}
+
+export function useRequestGuestExtension(reference: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (request: { requestedReturnAt: string; reason: string }) =>
+      apiClient.post<BookingExtension>(`/bookings/${encodeURIComponent(reference)}/extensions`, request),
+    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ['guest-booking', reference] }),
+  })
+}
+
+export function useBookingExtensions(status = 'pending') {
+  return useQuery({
+    queryKey: ['booking-extensions', status],
+    queryFn: () => apiClient.getAll<BookingExtension>(`/extensions?status=${encodeURIComponent(status)}`),
+  })
+}
+
+export function useReviewBookingExtension() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, request }: { id: string; request: BookingExtensionDecisionRequest }) =>
+      apiClient.post<BookingExtension>(`/extensions/${encodeURIComponent(id)}/decision`, request),
+    onSuccess: async (extension) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['booking-extensions'] }),
+      queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+      extension.booking ? queryClient.invalidateQueries({ queryKey: ['booking', extension.booking.id] }) : Promise.resolve(),
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
+    ]),
   })
 }
 

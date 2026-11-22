@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { auditEntries, bookings, DEMO_PASSWORD, drivers, incidents, mechanics, maintenanceWindows, staffMembers, users, vehicles } from './fixtures'
 import { buildDashboardData, searchFixtures } from '../features/dashboard/dashboardData'
-import type { AuditEntry, Booking, BookingCreateRequest, BookingPayment, DriverTripStatus, GuestBookingAccess, GuestBookingSummary, GuestCheckoutData, HandoverRequest, HandoverSettlement, MaintenanceWindow, MaintenanceWindowCreateRequest, MaintenanceWindowUpdateRequest, PaymentMethod, QuoteRequest, QuoteResponse, StaffInvitationRequest, StaffMember, StaffUpdateRequest, StkInitiation, StkStatus, Vehicle, VehicleCreateRequest, VehicleUpdateRequest } from '../api/types'
+import type { AuditEntry, Booking, BookingCreateRequest, BookingExtension, BookingPayment, DriverTripStatus, GuestBookingAccess, GuestBookingSummary, GuestCheckoutData, HandoverRequest, HandoverSettlement, MaintenanceWindow, MaintenanceWindowCreateRequest, MaintenanceWindowUpdateRequest, PaymentMethod, QuoteRequest, QuoteResponse, StaffInvitationRequest, StaffMember, StaffUpdateRequest, StkInitiation, StkStatus, Vehicle, VehicleCreateRequest, VehicleUpdateRequest } from '../api/types'
 import { getDriverEligibilityReason } from '../features/drivers/driverRules'
 import type { Incident, IncidentDispatchType, Mechanic, MechanicCreateRequest } from '../api/types'
 import { getNearestMechanics } from '../features/incidents/incidentGeo'
@@ -10,6 +10,7 @@ import { isAllowedOperationPhoto } from '../lib/image'
 
 let networkAttempts = 0
 const bookingStore: Booking[] = [...bookings]
+const extensionStore: BookingExtension[] = []
 const staffStore: StaffMember[] = [...staffMembers]
 const auditStore: AuditEntry[] = [...auditEntries]
 const bookingIdempotencyStore = new Map<string, { fingerprint: string; bookingId: string }>()
@@ -279,6 +280,20 @@ export const handlers = [
     const updated = { ...current, ...patch, ...(registration ? { registration } : {}) }
     vehicleStore[index] = updated
     return HttpResponse.json({ success: true, data: updated, error: null })
+  }),
+  http.post('/api/v1/vehicles/:vehicleId/image', async ({ params, request }) => {
+    if (!canManageFleet(request)) return fleetPermissionError(request)
+    const index = vehicleStore.findIndex((vehicle) => vehicle.id === params.vehicleId)
+    if (index < 0) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Vehicle was not found' } }, { status: 404 })
+    const form = await request.formData()
+    const image = form.get('image')
+    if (!(image instanceof File) || !['image/jpeg', 'image/png', 'image/webp'].includes(image.type) || image.size > 5 * 1024 * 1024) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_FILE', message: 'Upload a JPEG, PNG, or WebP image up to 5 MiB' } }, { status: 400 })
+    }
+    const updated = { ...vehicleStore[index], imageUrl: `https://images.example.test/vehicles/${vehicleStore[index].id}` }
+    vehicleStore[index] = updated
+    recordMockAudit(request, 'POST /api/v1/vehicles/:vehicleId/image', `vehicle:${vehicleStore[index].id}`)
+    return HttpResponse.json({ success: true, data: updated, error: null }, { status: 201 })
   }),
   http.get('/api/v1/maintenance-windows', ({ request }) => {
     if (!currentUser(request)) {
@@ -575,6 +590,61 @@ export const handlers = [
     }
     return HttpResponse.json({ success: true, data, error: null })
   }),
+  http.post('/api/v1/bookings/guest-holds', async ({ request }) => {
+    expireMockBookingHolds()
+    const body = await request.json() as QuoteRequest
+    const key = request.headers.get('Idempotency-Key')
+    if (!key || key.length < 16 || key.length > 128
+      || !body.vehicleId || !body.pickupLocation?.trim()
+      || !['self_drive', 'chauffeur'].includes(body.mode)
+      || !Array.isArray(body.extras) || body.extras.length > 10
+      || !Number.isFinite(Date.parse(body.pickupAt)) || Date.parse(body.pickupAt) <= Date.now()
+      || !Number.isFinite(Date.parse(body.returnAt)) || Date.parse(body.returnAt) <= Date.parse(body.pickupAt)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'VALIDATION_ERROR', message: 'Booking details are invalid' } }, { status: 400 })
+    }
+    const fingerprint = JSON.stringify(body)
+    const replay = bookingIdempotencyStore.get(`guest:${key}`)
+    if (replay) {
+      if (replay.fingerprint !== fingerprint) {
+        return HttpResponse.json({ success: false, data: null, error: { code: 'IDEMPOTENCY_CONFLICT', message: 'This request key was already used with different booking details' } }, { status: 409 })
+      }
+      const prior = bookingStore.find((booking) => booking.id === replay.bookingId)
+      if (prior) return HttpResponse.json({ success: true, data: { bookingId: prior.id, holdExpiresAt: prior.holdExpiresAt }, error: null }, { status: 201 })
+    }
+    if (!isVehicleAvailable(body.vehicleId, body.pickupAt, body.returnAt)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'VEHICLE_UNAVAILABLE', message: 'This vehicle is not available for those dates' } }, { status: 409 })
+    }
+    const vehicle = vehicleStore.find((item) => item.id === body.vehicleId)!
+    const quote = calculateMockQuote(body, vehicle.ratePerDay)
+    const bookingIndex = bookingStore.length + 1
+    const createdAt = new Date().toISOString()
+    const booking: Booking = {
+      id: `booking-${String(bookingIndex).padStart(2, '0')}`,
+      reference: `BK-${createdAt.slice(2, 7).replace('-', '')}-${String(bookingIndex).padStart(4, '0')}`,
+      vehicleId: body.vehicleId,
+      customerId: `cus-guest-${bookingIndex}`,
+      customerName: 'Guest',
+      customerPhone: 'pending',
+      customerEmail: 'pending',
+      customerIdNumber: 'pending',
+      pickupLocation: body.pickupLocation,
+      status: 'reserved',
+      pendingApproval: false,
+      mode: body.mode,
+      paymentMethod: 'mpesa_online',
+      holdExpiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
+      pickupAt: body.pickupAt,
+      returnAt: body.returnAt,
+      totalKes: quote.pricingSnapshot.totalDueKes,
+      pricingSnapshot: quote.pricingSnapshot,
+      payments: [],
+      events: [{ id: `evt-guest-${bookingIndex}`, type: 'booking.reserved', actor: 'Guest', note: 'Public booking hold created', createdAt }],
+      inspections: [],
+    }
+    bookingStore.push(booking)
+    bookingIdempotencyStore.set(`guest:${key}`, { fingerprint, bookingId: booking.id })
+    return HttpResponse.json({ success: true, data: { bookingId: booking.id, holdExpiresAt: booking.holdExpiresAt }, error: null }, { status: 201 })
+  }),
   http.post('/api/v1/bookings/:id/checkout', async ({ params, request }) => {
     const index = bookingStore.findIndex((item) => item.id === params.id && item.status === 'reserved')
     if (index < 0) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
@@ -649,6 +719,12 @@ export const handlers = [
       },
       vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, registration: vehicle.registration },
       cancellationAllowed: Date.parse(booking.pickupAt) - Date.now() >= 48 * 60 * 60 * 1000,
+      extensionRequest: extensionStore.find((extension) => extension.reference === booking.reference && extension.status === 'pending')
+        ? (() => {
+            const extension = extensionStore.find((item) => item.reference === booking.reference && item.status === 'pending')!
+            return { currentReturnAt: extension.currentReturnAt, requestedReturnAt: extension.requestedReturnAt, reason: extension.reason, feeKes: extension.feeKes, status: extension.status }
+          })()
+        : undefined,
     }
     return HttpResponse.json({ success: true, data, error: null })
   }),
@@ -666,6 +742,117 @@ export const handlers = [
       { success: true, data: { accepted: true }, error: null },
       { headers: { 'Set-Cookie': `booking_access=${encodeURIComponent(body.accessToken ?? '')}; Path=/api/v1/bookings/${encodeURIComponent(booking.reference)}; HttpOnly; Secure; SameSite=Lax; Expires=${new Date(expiresAt).toUTCString()}` } },
     )
+  }),
+  http.post('/api/v1/bookings/:ref/extensions', async ({ params, request, cookies }) => {
+    const token = cookies.booking_access
+    const access = token ? guestSessions.get(token) : undefined
+    const booking = access && access.expiresAt > Date.now()
+      ? bookingStore.find((item) => item.id === access.bookingId && item.reference === params.ref)
+      : undefined
+    if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'GUEST_ACCESS_INVALID', message: 'Booking link unavailable' } }, { status: 401 })
+    if (!['checked_out', 'overdue'].includes(booking.status)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'EXTENSION_UNAVAILABLE', message: 'Extension requests are only available during an active rental' } }, { status: 409 })
+    }
+    const body = await request.json() as { requestedReturnAt?: string; reason?: string }
+    const requestedReturnAt = Date.parse(body.requestedReturnAt ?? '')
+    if (!Number.isFinite(requestedReturnAt) || requestedReturnAt <= Date.now() || requestedReturnAt <= Date.parse(booking.returnAt) || !body.reason?.trim()) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_DATE_RANGE', message: 'Choose a future return time and enter a reason' } }, { status: 400 })
+    }
+    if (extensionStore.some((extension) => extension.reference === booking.reference && extension.status === 'pending')) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'EXTENSION_PENDING', message: 'A request is already awaiting review for this booking' } }, { status: 409 })
+    }
+    const vehicle = vehicleStore.find((item) => item.id === booking.vehicleId)
+    if (!vehicle) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Vehicle was not found' } }, { status: 404 })
+    const quote = calculateMockQuote({
+      vehicleId: vehicle.id,
+      pickupAt: booking.pickupAt,
+      returnAt: new Date(requestedReturnAt).toISOString(),
+      pickupLocation: booking.pickupLocation ?? 'Nairobi',
+      mode: booking.mode ?? 'self_drive',
+      driverLocation: booking.pricingSnapshot?.driverLocation,
+      extras: (booking.pricingSnapshot?.extras ?? []).map((item) => item.code),
+    }, vehicle.ratePerDay)
+    const extension: BookingExtension = {
+      id: `extension-${crypto.randomUUID()}`,
+      reference: booking.reference,
+      currentReturnAt: booking.returnAt,
+      requestedReturnAt: new Date(requestedReturnAt).toISOString(),
+      reason: body.reason.trim(),
+      status: 'pending',
+      feeKes: quote.pricingSnapshot.totalDueKes - booking.totalKes,
+      createdAt: new Date().toISOString(),
+      booking: { id: booking.id, reference: booking.reference, customerName: booking.customerName ?? 'Guest', vehicle: `${vehicle.make} ${vehicle.model}`, currentReturnAt: booking.returnAt, status: booking.status },
+    }
+    extensionStore.push(extension)
+    return HttpResponse.json({ success: true, data: extension, error: null }, { status: 201 })
+  }),
+  http.get('/api/v1/extensions', ({ request }) => {
+    const actor = currentUser(request)
+    if (!actor || !['owner', 'manager', 'agent'].includes(actor.role)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: actor ? 'FORBIDDEN' : 'UNAUTHENTICATED', message: 'Booking permission is required' } }, { status: actor ? 403 : 401 })
+    }
+    const status = new URL(request.url).searchParams.get('status') ?? 'pending'
+    return paginatedResponse(extensionStore.filter((extension) => extension.status === status), request)
+  }),
+  http.post('/api/v1/extensions/:extensionId/decision', async ({ params, request }) => {
+    const actor = currentUser(request)
+    if (!actor || !['owner', 'manager', 'agent'].includes(actor.role)) {
+      return HttpResponse.json({ success: false, data: null, error: { code: actor ? 'FORBIDDEN' : 'UNAUTHENTICATED', message: 'Booking permission is required' } }, { status: actor ? 403 : 401 })
+    }
+    const extension = extensionStore.find((item) => item.id === params.extensionId)
+    if (!extension || extension.status !== 'pending') {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'EXTENSION_REVIEWED', message: 'This extension request is no longer awaiting review' } }, { status: 409 })
+    }
+    const body = await request.json() as { decision?: string; paymentMethod?: 'cash' | 'mpesa_manual' | 'bank'; paymentReference?: string; reviewNote?: string }
+    if (!['approve', 'decline'].includes(body.decision ?? '')) {
+      return HttpResponse.json({ success: false, data: null, error: { code: 'VALIDATION_ERROR', message: 'Choose whether to approve or decline this extension' } }, { status: 400 })
+    }
+    const booking = bookingStore.find((item) => item.reference === extension.reference)
+    const vehicle = booking && vehicleStore.find((item) => item.id === booking.vehicleId)
+    if (!booking || !vehicle) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking was not found' } }, { status: 404 })
+    if (body.decision === 'approve') {
+      if (bookingStore.some((item) => item.id !== booking.id && item.vehicleId === booking.vehicleId && overlaps(item, booking.returnAt, extension.requestedReturnAt))
+        || maintenanceStore.some((item) => item.vehicleId === booking.vehicleId && overlapsMaintenance(item, booking.returnAt, extension.requestedReturnAt))) {
+        return HttpResponse.json({ success: false, data: null, error: { code: 'EXTENSION_UNAVAILABLE', message: 'The vehicle is no longer available for the requested extension' } }, { status: 409 })
+      }
+      const quote = calculateMockQuote({
+        vehicleId: vehicle.id,
+        pickupAt: booking.pickupAt,
+        returnAt: extension.requestedReturnAt,
+        pickupLocation: booking.pickupLocation ?? 'Nairobi',
+        mode: booking.mode ?? 'self_drive',
+        driverLocation: booking.pricingSnapshot?.driverLocation,
+        extras: (booking.pricingSnapshot?.extras ?? []).map((item) => item.code),
+      }, vehicle.ratePerDay)
+      const feeKes = quote.pricingSnapshot.totalDueKes - booking.totalKes
+      if (feeKes > 0 && (!body.paymentMethod || !body.paymentReference?.trim())) {
+        return HttpResponse.json({ success: false, data: null, error: { code: 'INVALID_EXTENSION_PAYMENT', message: 'Offline payment details are required for this extension' } }, { status: 400 })
+      }
+      booking.returnAt = extension.requestedReturnAt
+      booking.totalKes = quote.pricingSnapshot.totalDueKes
+      booking.pricingSnapshot = quote.pricingSnapshot
+      if (feeKes > 0 && body.paymentMethod && body.paymentReference) {
+        booking.payments = [...(booking.payments ?? []), {
+          id: `payment-extension-${crypto.randomUUID()}`,
+          method: body.paymentMethod,
+          amountKes: feeKes,
+          status: 'paid',
+          reference: body.paymentReference.trim(),
+          createdAt: new Date().toISOString(),
+        }]
+      }
+      booking.events = [...(booking.events ?? []), { id: `evt-extension-${crypto.randomUUID()}`, type: 'booking.extended', actor: actor.name, note: body.paymentReference ? `Rental extended; offline payment reference ${body.paymentReference.trim()}` : 'Rental extended without an additional charge', createdAt: new Date().toISOString() }]
+      extension.feeKes = feeKes
+      extension.paymentMethod = body.paymentMethod
+      extension.paymentReference = body.paymentReference?.trim()
+      extension.status = 'approved'
+    } else {
+      extension.status = 'declined'
+    }
+    extension.reviewNote = body.reviewNote
+    extension.reviewedAt = new Date().toISOString()
+    recordMockAudit(request, `extension.${extension.status}`, extension.reference)
+    return HttpResponse.json({ success: true, data: extension, error: null })
   }),
   http.post('/api/v1/bookings/:bookingKey/cancel', async ({ params, request, cookies }) => {
     const token = cookies.booking_access
@@ -830,8 +1017,8 @@ export const handlers = [
     if (vehicle) vehicle.status = body.criticalDefect ? 'maintenance' : 'available'
     return HttpResponse.json({ success: true, data: updated, error: null })
   }),
-  http.post('/api/v1/bookings/:id/payments/stk', async ({ params, request }) => {
-    const booking = bookingStore.find((item) => item.id === params.id)
+  http.post('/api/v1/bookings/:reference/payments/stk', async ({ params, request }) => {
+    const booking = bookingStore.find((item) => item.reference === params.reference)
     if (!booking) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Booking not found' } }, { status: 404 })
     if (booking.status === 'reserved' && booking.holdExpiresAt && Date.parse(booking.holdExpiresAt) <= Date.now()) {
       return HttpResponse.json({ success: false, data: null, error: { code: 'HOLD_EXPIRED', message: 'The booking hold has expired' } }, { status: 409 })
@@ -844,11 +1031,12 @@ export const handlers = [
     const result: StkInitiation = { paymentId, maskedPhone, amountKes: booking.totalKes }
     return HttpResponse.json({ success: true, data: result, error: null }, { status: 201 })
   }),
-  http.get('/api/v1/payments/:paymentId/status', ({ params }) => {
+  http.get('/api/v1/bookings/:reference/payments/:paymentId/status', ({ params }) => {
     const attempt = stkAttempts.get(String(params.paymentId))
     if (!attempt) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Payment attempt not found' } }, { status: 404 })
-    attempt.polls += 1
     const booking = bookingStore.find((item) => item.id === attempt.bookingId)!
+    if (booking.reference !== params.reference) return HttpResponse.json({ success: false, data: null, error: { code: 'NOT_FOUND', message: 'Payment attempt not found' } }, { status: 404 })
+    attempt.polls += 1
     const finalDigit = attempt.phone.at(-1)
     let outcome: StkStatus['outcome'] = 'pending'
     let paidAmountKes: number | undefined
@@ -1155,6 +1343,7 @@ export const handlers = [
       data: {
         pendingApprovals: canApprove ? bookingStore.filter((booking) => booking.status === 'reserved' && booking.pendingApproval !== false).length : 0,
         openIncidents: canReadIncidents ? incidentStore.filter((incident) => incident.status !== 'resolved').length : 0,
+        pendingExtensions: canApprove ? extensionStore.filter((extension) => extension.status === 'pending').length : 0,
       },
       error: null,
     })

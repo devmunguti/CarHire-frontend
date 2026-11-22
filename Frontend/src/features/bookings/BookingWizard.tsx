@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
+import { CarFront } from 'lucide-react'
 import { ApiError, apiClient } from '../../api/client'
-import { isMockApiEnabled } from '../../api/config'
 import { useAvailableVehicles, useCreateBooking } from '../../api/queries'
 import type { Booking, DriveMode, QuoteRequest, QuoteResponse, Vehicle } from '../../api/types'
 import { Button, DateTimeRangePicker, Input, PhoneInput, Select, Stepper } from '../../components/ui'
@@ -49,6 +49,7 @@ function VehiclePrice({ vehicle, request, onSelect, selected }: { vehicle: Vehic
 
   return (
     <button aria-pressed={selected} className={`vehicle-choice${selected ? ' is-selected' : ''}`} onClick={onSelect} type="button">
+      {vehicle.imageUrl ? <img alt="" className="vehicle-choice__image" loading="lazy" src={vehicle.imageUrl} /> : <span aria-hidden="true" className="vehicle-choice__image vehicle-choice__image--empty"><CarFront size={22} /></span>}
       <span className="vehicle-choice__details"><b>{vehicle.make} {vehicle.model}</b><small>{vehicle.registration} · {vehicle.seats} {t('styleguide.seats')}</small></span>
       <span className="vehicle-choice__price">{quote ? formatKes(quote.pricingSnapshot.totalDueKes) : t('booking.calculating')}</span>
     </button>
@@ -60,7 +61,7 @@ export function BookingWizard() {
   const [searchParams] = useSearchParams()
   const [step, setStep] = useState(0)
   const [mode, setMode] = useState<DriveMode>('self_drive')
-  const [paymentMethod, setPaymentMethod] = useState<'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'>(() => isMockApiEnabled ? 'mpesa_online' : 'cash')
+  const [paymentMethod, setPaymentMethod] = useState<'mpesa_online' | 'mpesa_manual' | 'cash' | 'bank' | 'corporate'>('mpesa_online')
   const [request, setRequest] = useState<QuoteRequest>(() => ({
     vehicleId: searchParams.get('vehicleId') ?? '',
     pickupAt: searchParams.get('pickupAt') ?? '',
@@ -200,7 +201,7 @@ export function BookingWizard() {
             <div><dt>{t('booking.return')}</dt><dd>{request.returnAt ? formatEat(request.returnAt) : '—'}</dd></div>
           </dl></section>
           {quote && <QuoteBreakdown quote={quote} />}
-          <Select label={t('booking.paymentMethod')} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)} options={paymentMethodOptions.filter((option) => isMockApiEnabled || option.value !== 'mpesa_online').map(({ value, labelKey }) => ({ value, label: t(labelKey) }))} value={paymentMethod} />
+          <Select label={t('booking.paymentMethod')} onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)} options={paymentMethodOptions.map(({ value, labelKey }) => ({ value, label: t(labelKey) }))} value={paymentMethod} />
           {conflict && <p className="quote-conflict" role="alert">{t('booking.reserveConflict')}</p>}
           {createError && <p className="field__error" role="alert">{t('booking.actionError')}</p>}
         </div>}

@@ -1,5 +1,5 @@
 import {
-  Activity, Bell, CarFront, ChevronLeft, ChevronRight, ClipboardList, Gauge, LogOut,
+  Activity, Bell, CarFront, CalendarClock, ChevronLeft, ChevronRight, ClipboardList, Gauge, LogOut,
   Menu, Moon, Sun, Users, Wrench,
 } from 'lucide-react'
 import { useEffect, useState, type ComponentType } from 'react'
@@ -26,6 +26,7 @@ const staffLinks: StaffLink[] = [
   { to: '/admin', key: 'page.dashboard', icon: Gauge, permission: 'dashboard:view', end: true },
   { to: '/admin/vehicles', key: 'page.fleet', icon: CarFront, permission: 'vehicles:read' },
   { to: '/admin/bookings', key: 'page.bookings', icon: ClipboardList, permission: 'bookings:create' },
+  { to: '/admin/extensions', key: 'page.extensions', icon: CalendarClock, permission: 'bookings:create' },
   { to: '/admin/approvals', key: 'page.approvals', icon: ClipboardList, permission: 'approvals:offline' },
   { to: '/admin/handover', key: 'page.handover', icon: CarFront, permission: 'handover:manage' },
   { to: '/admin/timeline', key: 'page.timeline', icon: Activity, permission: 'timeline:view' },
@@ -66,9 +67,9 @@ function OfflineBanner() {
   return offline ? <div className="offline-banner" role="status">{t('admin.offline')}</div> : null
 }
 
-function NotificationsMenu({ pendingApprovals, openIncidents }: { pendingApprovals: number; openIncidents: number }) {
+function NotificationsMenu({ pendingApprovals, openIncidents, pendingExtensions }: { pendingApprovals: number; openIncidents: number; pendingExtensions: number }) {
   const [open, setOpen] = useState(false)
-  const total = pendingApprovals + openIncidents
+  const total = pendingApprovals + openIncidents + pendingExtensions
   return (
     <div className="staff-popover-wrap">
       <IconButton aria-expanded={open} aria-haspopup="true" icon={<Bell size={18} />} label={`${t('admin.notifications')} ${total}`} onClick={() => setOpen(!open)} />
@@ -76,6 +77,7 @@ function NotificationsMenu({ pendingApprovals, openIncidents }: { pendingApprova
       {open && <div className="staff-popover" role="group">
         {pendingApprovals > 0 && <Link onClick={() => setOpen(false)} to="/admin/approvals">{t('admin.approvalAlerts')} <b>{pendingApprovals}</b></Link>}
         {openIncidents > 0 && <Link onClick={() => setOpen(false)} to="/admin/incidents">{t('admin.sosAlerts')} <b>{openIncidents}</b></Link>}
+        {pendingExtensions > 0 && <Link onClick={() => setOpen(false)} to="/admin/extensions">{t('admin.extensionAlerts')} <b>{pendingExtensions}</b></Link>}
         {total === 0 && <span>{t('admin.noNotifications')}</span>}
       </div>}
     </div>
@@ -116,6 +118,7 @@ export function StaffLayout() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
   const pendingApprovals = notifications.data?.pendingApprovals ?? 0
   const openIncidents = notifications.data?.openIncidents ?? 0
+  const pendingExtensions = notifications.data?.pendingExtensions ?? 0
 
   function toggleTheme() {
     const nextTheme = theme === 'light' ? 'dark' : 'light'
@@ -139,7 +142,7 @@ export function StaffLayout() {
       <aside className={`staff-sidebar${mobileOpen ? ' is-mobile-open' : ''}`}>
         <Link aria-label={t('admin.brand')} className="brand" to={role ? getRoleLandingPath(role) : '/admin'}>
           <span className="brand__mark"><CarFront aria-hidden="true" size={23} /></span>
-          <span className="brand__name">AutoHire <b>KE</b></span>
+          <span className="brand__name">Gari Poa</span>
         </Link>
         <nav aria-label={t('admin.navigation')} className="staff-nav">
           {staffLinks.map((item) => <StaffNavItem collapsed={collapsed} item={item} key={item.to} onNavigate={() => setMobileOpen(false)} />)}
@@ -155,7 +158,7 @@ export function StaffLayout() {
           </div>
           <div className="staff-topbar__tools">
             <GlobalSearch />
-            <NotificationsMenu openIncidents={openIncidents} pendingApprovals={pendingApprovals} />
+            <NotificationsMenu openIncidents={openIncidents} pendingApprovals={pendingApprovals} pendingExtensions={pendingExtensions} />
             <IconButton icon={theme === 'light' ? <Moon size={18} /> : <Sun size={18} />} label={t(theme === 'light' ? 'styleguide.dark' : 'styleguide.light')} onClick={toggleTheme} />
             {user && <UserMenu name={user.name} onLogout={() => void signOut()} role={user.role} />}
           </div>

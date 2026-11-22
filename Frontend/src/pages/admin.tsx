@@ -101,7 +101,7 @@ export function ProfilePage() {
 
   return (
     <section className="page-shell">
-      <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Profile</h1></div></header>
+      <header className="page-header"><div><p className="eyebrow">Gari Poa</p><h1>Profile</h1></div></header>
       <form className="card-panel stack stack--md" onSubmit={(event) => void submit(event)}>
         <Input label="Full name" onChange={(event) => setName(event.target.value)} required value={name} />
         <Input label="Email" readOnly value={user?.email ?? ''} />
@@ -180,7 +180,7 @@ export function ApprovalsPage() {
 
   return (
     <section className="page-shell">
-      <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Approvals</h1></div></header>
+      <header className="page-header"><div><p className="eyebrow">Gari Poa</p><h1>Approvals</h1></div></header>
       <div className="stack stack--lg">
         <div className="card-panel">
           {approvals.isLoading && <Skeleton rows={4} />}
@@ -345,7 +345,7 @@ export function StaffPage() {
 
   return (
     <section className="page-shell">
-      <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Staff</h1></div></header>
+      <header className="page-header"><div><p className="eyebrow">Gari Poa</p><h1>Staff</h1></div></header>
       <div className="split-layout">
         <div className="card-panel">
           {staff.isLoading && <Skeleton rows={5} />}
@@ -446,7 +446,7 @@ export function AuditPage() {
 
   return (
     <section className="page-shell">
-      <header className="page-header"><div><p className="eyebrow">AutoHire KE</p><h1>Audit log</h1></div></header>
+      <header className="page-header"><div><p className="eyebrow">Gari Poa</p><h1>Audit log</h1></div></header>
       <div className="card-panel stack stack--md">
         <div className="filter-grid">
           <Input label="From date" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />

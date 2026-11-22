@@ -23,6 +23,7 @@ const LoginPage = lazy(() => import('./features/auth/LoginPage').then((module) =
 const DashboardPage = lazy(() => import('./features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const FleetPage = lazy(() => import('./features/fleet/FleetPage').then((module) => ({ default: module.FleetPage })))
 const BookingsPage = lazy(() => import('./features/bookings/BookingsListPage').then((module) => ({ default: module.BookingsListPage })))
+const ExtensionsPage = lazy(() => import('./features/bookings/ExtensionsPage').then((module) => ({ default: module.ExtensionsPage })))
 const BookingWizardPage = lazy(() => import('./features/bookings/BookingWizard').then((module) => ({ default: module.BookingWizard })))
 const BookingDetailPage = lazy(() => import('./features/bookings/BookingDetailPage').then((module) => ({ default: module.BookingDetailPage })))
 const HandoverPage = lazy(() => import('./features/bookings/HandoverPage').then((module) => ({ default: module.HandoverPage })))
@@ -95,6 +96,7 @@ export const router = createBrowserRouter([
         { path: 'vehicles/:id/edit', element: protectedPage(['owner', 'manager'], FleetPage) },
         { path: 'fleet', element: protectedPage(vehicleReadRoles, FleetPage) },
         { path: 'bookings', element: protectedPage(officeRoles, BookingsPage) },
+        { path: 'extensions', element: protectedPage(officeRoles, ExtensionsPage) },
         { path: 'bookings/new', element: protectedPage(officeRoles, BookingWizardPage) },
         { path: 'bookings/:id', element: protectedPage(['owner', 'manager', 'agent', 'driver'], BookingDetailPage) },
         { path: 'bookings/:id/check-out', element: protectedPage(handoverRoles, HandoverPage) },
